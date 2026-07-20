@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gesundheitswerte (MVP)
 
-## Getting Started
+Web-App zur zentralen, kategorisierten Ansicht persönlicher Gesundheitswerte
+(Blut, Urin, Stuhl, Allergie). Kein Wearable-Sync, kein Arztbrief-Upload,
+kein Onboarding, kein Auth-UI -- nur die Datenbank-Ansicht.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Next.js (App Router) + TypeScript + Tailwind CSS
+- Supabase (Postgres) mit Row-Level-Security, Zugriff über `@supabase/supabase-js`
+  (kein ORM -- bei reinem Read-Display für 4 Tabs wäre Prisma/Drizzle unnötiger
+  Overhead)
+- `src/core/` ist framework-agnostisch (keine Next.js-Imports): Typen,
+  Supabase-Client-Factory, Query-Funktionen, Referenzbereichs-Logik. Diese
+  Schicht soll später 1:1 in eine React Native/Expo-App wandern.
+
+## Setup
+
+1. Supabase-Projekt anlegen (oder `supabase start` lokal, falls die
+   Supabase CLI installiert ist).
+2. Migrationen ausführen: `supabase/migrations/0001_schema.sql`, dann
+   `0002_rls_policies.sql` (SQL-Editor im Dashboard oder `supabase db push`).
+3. Seed-Daten laden: `supabase/seed.sql`.
+4. `.env.local.example` nach `.env.local` kopieren und mit den Werten aus
+   Project Settings -> API befüllen.
+5. `npm install && npm run dev`, dann [http://localhost:3000](http://localhost:3000)
+   öffnen (redirected auf `/blutanalyse`).
+
+## Datenmodell
+
+```
+lab_categories (id, name, tab, sort_order)
+lab_subcategories (id, category_id, name, sort_order)
+lab_parameters (id, subcategory_id, name, unit, description_short,
+                learn_more_url, result_type [numeric|qualitative], sort_order)
+lab_reference_ranges (id, parameter_id, min, max, qualitative_normal,
+                      gender [m|f|all], age_min, age_max)
+lab_results (id, user_id, parameter_id, value, value_qualitative,
+             measured_at, source_document_id)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Verlauf ist im Schema bereits möglich (mehrere `lab_results` pro
+`parameter_id`/`user_id`); die App zeigt aktuell nur den jeweils neuesten
+Wert (`getTabOverview`/`getParameterDetail` sortieren nach `measured_at desc`
+und nehmen den ersten Treffer).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Kein Auth im MVP
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`src/core/demoUser.ts` definiert eine feste `DEMO_USER_ID` (muss mit
+`user_id` in `seed.sql` übereinstimmen) plus eine Platzhalter-Demografie
+(Geschlecht/Alter) für die Referenzbereichs-Auswahl. Der Next.js-Server
+liest mit dem Supabase **Service-Role-Key** (`src/app/lib/supabaseServer.ts`,
+server-only, niemals im Client verwenden), da RLS auf `lab_results` bereits
+scharf auf `auth.uid() = user_id` steht. Sobald echtes Auth aktiviert wird,
+muss nur `DEMO_USER_ID`/`DEMO_USER_PROFILE` durch die echte Session ersetzt
+werden -- die RLS-Policies und Queries bleiben unverändert.
 
-## Learn More
+## Platzhalter, die vor echtem Einsatz ersetzt werden müssen
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Referenzbereiche in `supabase/seed.sql`: plausible Literaturwerte, keine
+  geprüften Laborreferenzen.
+- `learn_more_url` pro Parameter: zeigt auf eine Platzhalter-Domain
+  (`platzhalter-lexikon.example`), gedacht als austauschbares Datenfeld.
+- `DEMO_USER_PROFILE` (Geschlecht/Alter): fest codiert, da es noch kein
+  User-Profil gibt.
