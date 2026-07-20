@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { TabNav } from "@/app/components/TabNav";
+import { PrimaryNav } from "@/app/components/PrimaryNav";
 import { LogoMark } from "@/app/components/Logo";
 import "./globals.css";
 
@@ -29,7 +29,9 @@ export default function RootLayout({
             <span className="text-xl font-light tracking-tight text-ink">vitalis</span>
             <span className="hidden text-sm text-muted sm:inline">— Kenn dich. Von innen.</span>
           </div>
-          <TabNav />
+          <div className="pb-3">
+            <PrimaryNav />
+          </div>
         </header>
         {children}
       </body>
