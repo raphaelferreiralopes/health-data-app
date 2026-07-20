@@ -4,8 +4,13 @@
 
 create extension if not exists "pgcrypto";
 
+-- `key` columns are stable, human-readable identifiers (e.g. 'hemoglobin')
+-- independent of the uuid primary key -- used by supabase/seed.sql to wire
+-- up foreign keys without hand-rolled uuid literals, and available later
+-- for deep-linking or LOINC-style cross-referencing.
 create table if not exists lab_categories (
   id uuid primary key default gen_random_uuid(),
+  key text not null unique,
   name text not null,
   tab text not null check (tab in ('blutanalyse', 'urin', 'stuhl', 'allergie')),
   sort_order int not null default 0
@@ -14,6 +19,7 @@ create table if not exists lab_categories (
 create table if not exists lab_subcategories (
   id uuid primary key default gen_random_uuid(),
   category_id uuid not null references lab_categories(id) on delete cascade,
+  key text not null unique,
   name text not null,
   sort_order int not null default 0
 );
@@ -21,7 +27,9 @@ create table if not exists lab_subcategories (
 create table if not exists lab_parameters (
   id uuid primary key default gen_random_uuid(),
   subcategory_id uuid not null references lab_subcategories(id) on delete cascade,
+  key text not null unique,
   name text not null,
+  abbreviation text,
   unit text,
   description_short text not null default '',
   -- Placeholder field: swap for real trusted sources per parameter later.

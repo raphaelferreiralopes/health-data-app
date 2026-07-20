@@ -70,7 +70,7 @@ export async function getTabOverview({
 
   const { data: parameterRows, error: parameterError } = await supabase
     .from('lab_parameters')
-    .select('id, subcategory_id, name, unit, description_short, learn_more_url, result_type, sort_order')
+    .select('id, subcategory_id, name, abbreviation, unit, description_short, learn_more_url, result_type, sort_order')
     .in('subcategory_id', subcategoryIds)
     .order('sort_order');
   if (parameterError) throw parameterError;
@@ -79,6 +79,7 @@ export async function getTabOverview({
     id: p.id,
     subcategoryId: p.subcategory_id,
     name: p.name,
+    abbreviation: p.abbreviation,
     unit: p.unit,
     descriptionShort: p.description_short,
     learnMoreUrl: p.learn_more_url,

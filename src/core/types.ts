@@ -22,6 +22,7 @@ export interface LabParameter {
   id: string;
   subcategoryId: string;
   name: string;
+  abbreviation: string | null;
   unit: string | null;
   descriptionShort: string;
   /** Placeholder field: swap for a real trusted source per parameter. */

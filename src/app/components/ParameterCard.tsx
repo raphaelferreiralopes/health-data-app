@@ -24,7 +24,10 @@ export function ParameterCard({ pw, onSelect }: { pw: ParameterWithResult; onSel
       className="flex w-full flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-medium text-slate-900">{pw.parameter.name}</span>
+        <span className="font-medium text-slate-900">
+          {pw.parameter.name}
+          {pw.parameter.abbreviation && <span className="ml-1.5 text-xs font-normal text-slate-400">({pw.parameter.abbreviation})</span>}
+        </span>
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${statusDotClassName(pw.status)}`} aria-hidden />
       </div>
       <span className="text-lg font-semibold text-slate-900">{formatValue(pw)}</span>

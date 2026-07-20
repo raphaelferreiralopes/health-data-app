@@ -38,6 +38,7 @@ export function ParameterDetailSheet({ pw, onClose }: { pw: ParameterWithResult;
         <div className="flex items-start justify-between gap-4">
           <h2 id="parameter-detail-title" className="text-xl font-semibold text-slate-900">
             {pw.parameter.name}
+            {pw.parameter.abbreviation && <span className="ml-1.5 text-base font-normal text-slate-400">({pw.parameter.abbreviation})</span>}
           </h2>
           <button
             type="button"

@@ -20,7 +20,7 @@ export async function getParameterDetail({
 }: FetchParameterDetailArgs): Promise<ParameterWithResult | null> {
   const { data: parameterRow, error: parameterError } = await supabase
     .from('lab_parameters')
-    .select('id, subcategory_id, name, unit, description_short, learn_more_url, result_type, sort_order')
+    .select('id, subcategory_id, name, abbreviation, unit, description_short, learn_more_url, result_type, sort_order')
     .eq('id', parameterId)
     .maybeSingle();
   if (parameterError) throw parameterError;
@@ -73,6 +73,7 @@ export async function getParameterDetail({
       id: parameterRow.id,
       subcategoryId: parameterRow.subcategory_id,
       name: parameterRow.name,
+      abbreviation: parameterRow.abbreviation,
       unit: parameterRow.unit,
       descriptionShort: parameterRow.description_short,
       learnMoreUrl: parameterRow.learn_more_url,
