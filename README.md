@@ -23,8 +23,9 @@ kein Onboarding, kein Auth-UI -- nur die Datenbank-Ansicht.
 3. Seed-Daten laden: `supabase/seed.sql`.
 4. `.env.local.example` nach `.env.local` kopieren und mit den Werten aus
    Project Settings -> API befüllen.
-5. `npm install && npm run dev`, dann [http://localhost:3000](http://localhost:3000)
-   öffnen (redirected auf `/blutanalyse`).
+5. `npm install && npm run dev`, dann [http://localhost:3010](http://localhost:3010)
+   öffnen (redirected auf `/blutanalyse`). Port 3010 ist fest im `dev`-Skript
+   hinterlegt, damit `journal-app` weiter Port 3000 nutzen kann.
 
 ## Datenmodell
 
