@@ -1,21 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { TabNav } from "@/app/components/TabNav";
+import { LogoMark } from "@/app/components/Logo";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Gesundheitswerte",
-  description: "Übersicht deiner Laborwerte, Allergietests und Befunde",
+  title: "vitalis",
+  description: "Kenn dich. Von innen.",
 };
 
 export default function RootLayout({
@@ -24,14 +21,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="de"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-slate-50">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6">
-            <h1 className="text-lg font-semibold text-slate-900">Gesundheitswerte</h1>
+    <html lang="de" className={`${inter.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-surface font-sans text-ink">
+        <header className="border-b border-line bg-surface">
+          <div className="mx-auto flex max-w-5xl items-center gap-2.5 px-4 py-4 sm:px-6">
+            <LogoMark className="h-6 w-6" />
+            <span className="text-xl font-light tracking-tight text-ink">vitalis</span>
+            <span className="hidden text-sm text-muted sm:inline">— Kenn dich. Von innen.</span>
           </div>
           <TabNav />
         </header>

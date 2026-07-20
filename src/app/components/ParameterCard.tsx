@@ -21,18 +21,18 @@ export function ParameterCard({ pw, onSelect }: { pw: ParameterWithResult; onSel
     <button
       type="button"
       onClick={() => onSelect(pw)}
-      className="flex w-full flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+      className="flex w-full flex-col gap-1 rounded-2xl border border-line bg-surface p-4 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-medium text-slate-900">
+        <span className="font-medium text-ink">
           {pw.parameter.name}
-          {pw.parameter.abbreviation && <span className="ml-1.5 text-xs font-normal text-slate-400">({pw.parameter.abbreviation})</span>}
+          {pw.parameter.abbreviation && <span className="ml-1.5 text-xs font-normal text-muted">({pw.parameter.abbreviation})</span>}
         </span>
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${statusDotClassName(pw.status)}`} aria-hidden />
       </div>
-      <span className="text-lg font-semibold text-slate-900">{formatValue(pw)}</span>
-      <span className="text-xs text-slate-500">Referenz: {formatReferenceRange(pw.applicableRange, pw.parameter.unit)}</span>
-      <span className="text-xs text-slate-400">{formatDate(pw.result.measuredAt)}</span>
+      <span className="text-lg font-semibold text-ink">{formatValue(pw)}</span>
+      <span className="text-xs text-muted">Referenz: {formatReferenceRange(pw.applicableRange, pw.parameter.unit)}</span>
+      <span className="text-xs text-muted/70">{formatDate(pw.result.measuredAt)}</span>
     </button>
   );
 }

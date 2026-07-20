@@ -1,26 +1,37 @@
 @import "tailwindcss";
 
+/* Vitalis CI: siehe Vitalis_Visual_Board.html (Farbpalette, Typografie) */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1d1d1f;
+
+  --vitalis-white: #ffffff;
+  --vitalis-gray-1: #f5f5f7;
+  --vitalis-gray-2: #d2d2d7;
+  --vitalis-gray-3: #86868b;
+  --vitalis-ink: #1d1d1f;
+  --vitalis-blue: #0071e3;
+  --vitalis-blue-deep: #0051a8;
+  --vitalis-blue-pale: #e8f1fc;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-inter);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-surface: var(--vitalis-white);
+  --color-card: var(--vitalis-gray-1);
+  --color-line: var(--vitalis-gray-2);
+  --color-muted: var(--vitalis-gray-3);
+  --color-ink: var(--vitalis-ink);
+  --color-brand: var(--vitalis-blue);
+  --color-brand-deep: var(--vitalis-blue-deep);
+  --color-brand-pale: var(--vitalis-blue-pale);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums;
 }

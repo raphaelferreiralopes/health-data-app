@@ -9,7 +9,7 @@ export function TabOverview({ categories, emptyLabel }: { categories: CategoryOv
   const [selected, setSelected] = useState<ParameterWithResult | null>(null);
 
   if (categories.length === 0) {
-    return <p className="py-12 text-center text-sm text-slate-500">{emptyLabel}</p>;
+    return <p className="py-12 text-center text-sm text-muted">{emptyLabel}</p>;
   }
 
   return (
