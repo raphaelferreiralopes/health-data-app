@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { PrimaryNav } from "@/app/components/PrimaryNav";
 import { LogoMark } from "@/app/components/Logo";
+import { AuthGate } from "@/app/components/AuthGate";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,7 +31,10 @@ export default function RootLayout({
             <span className="hidden text-sm text-muted sm:inline">— Kenn dich. Von innen.</span>
           </div>
           <div className="pb-3">
-            <PrimaryNav />
+            <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+              <PrimaryNav />
+              <AuthGate />
+            </div>
           </div>
         </header>
         {children}

@@ -2,11 +2,11 @@ import { createSupabaseClient } from '@/core/supabaseClient';
 
 /**
  * Server-only client using the service-role key, which bypasses RLS.
- * That's intentional for the MVP: there is no login UI yet, so requests
- * aren't authenticated as a real Supabase user, and RLS policies on
- * lab_results key off auth.uid(). All queries here filter explicitly by
- * DEMO_USER_ID instead (see src/core/demoUser.ts). Never import this file
- * from a Client Component or expose the service-role key to the browser.
+ * Callers must filter explicitly by the intended user id (the signed-in
+ * user's id from supabaseServerAuth.ts, or DEMO_USER_ID as a fallback for
+ * anonymous visitors — see src/core/demoUser.ts) since RLS won't do it for
+ * them. Never import this file from a Client Component or expose the
+ * service-role key to the browser.
  */
 export function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
