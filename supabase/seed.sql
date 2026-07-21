@@ -5,7 +5,7 @@
 -- gelassen, siehe Sheet 'Legende'). learn_more_url zeigt auf eine austauschbare
 -- Platzhalter-Domain. Beides vor echtem Einsatz durch geprüfte Quellen ersetzen.
 
-truncate table lab_results, lab_reference_ranges, lab_parameters, lab_subcategories, lab_categories cascade;
+truncate table lab_results, lab_reference_ranges, lab_parameters, lab_subcategories, lab_categories, organ_lab_subcategories cascade;
 
 -- Demo-User (kein Auth im MVP aktiv, siehe src/core/demoUser.ts)
 -- 00000000-0000-0000-0000-000000000001
@@ -384,3 +384,40 @@ insert into lab_results (user_id, parameter_id, value, value_qualitative, measur
   ('00000000-0000-0000-0000-000000000001', (select id from lab_parameters where key = 'occult_blood'), null, 'negativ', '2026-06-05'),
   ('00000000-0000-0000-0000-000000000001', (select id from lab_parameters where key = 'ige_total'), 145, null, '2026-05-20'),
   ('00000000-0000-0000-0000-000000000001', (select id from lab_parameters where key = 'ige_birch_pollen'), 2.1, null, '2026-05-20');
+
+-- ===== BioMarker-Map: Organ -> Laborkategorie =====
+-- organ_key entspricht den IDs aus src/app/components/BodyOrganMap.tsx.
+-- Mapping auf Subcategory-Ebene, nur wo fachlich eindeutig -- einige Organe
+-- (Lunge, Magen, Speiseröhre, Gehirn, Rückenmark, Milz) haben aktuell keine
+-- passenden Parameter im Katalog und bleiben bewusst ohne Zuordnung.
+insert into organ_lab_subcategories (organ_key, subcategory_id) values
+  ('herz', (select id from lab_subcategories where key = 'cardiac_markers')),
+  ('blutgefaesse', (select id from lab_subcategories where key = 'lipids')),
+  ('blutgefaesse', (select id from lab_subcategories where key = 'coagulation')),
+  ('leber', (select id from lab_subcategories where key = 'liver')),
+  ('leber', (select id from lab_subcategories where key = 'serology')),
+  ('leber', (select id from lab_subcategories where key = 'tumor_markers')),
+  ('gallenblase', (select id from lab_subcategories where key = 'liver')),
+  ('duenndarm', (select id from lab_subcategories where key = 'vitamins')),
+  ('duenndarm', (select id from lab_subcategories where key = 'iron_metabolism')),
+  ('duenndarm', (select id from lab_subcategories where key = 'trace_elements')),
+  ('dickdarm', (select id from lab_subcategories where key = 'colorectal_screening')),
+  ('dickdarm', (select id from lab_subcategories where key = 'stool_inflammation_markers')),
+  ('dickdarm', (select id from lab_subcategories where key = 'stool_infection_diagnostics')),
+  ('dickdarm', (select id from lab_subcategories where key = 'microbiome')),
+  ('dickdarm', (select id from lab_subcategories where key = 'tumor_markers')),
+  ('pankreas', (select id from lab_subcategories where key = 'metabolism')),
+  ('niere', (select id from lab_subcategories where key = 'kidney')),
+  ('niere', (select id from lab_subcategories where key = 'kidney_early_detection')),
+  ('niere', (select id from lab_subcategories where key = 'electrolytes')),
+  ('harnblase', (select id from lab_subcategories where key = 'urine_status')),
+  ('harnblase', (select id from lab_subcategories where key = 'urine_culture')),
+  ('harnblase', (select id from lab_subcategories where key = 'urine_drug_screening')),
+  ('schilddruese', (select id from lab_subcategories where key = 'thyroid')),
+  ('nebenniere', (select id from lab_subcategories where key = 'adrenal')),
+  ('lymphsystem', (select id from lab_subcategories where key = 'inflammation_markers')),
+  ('lymphsystem', (select id from lab_subcategories where key = 'autoimmune_markers')),
+  ('haut', (select id from lab_subcategories where key = 'allergy_general')),
+  ('haut', (select id from lab_subcategories where key = 'allergy_skin_tests')),
+  ('fortpflanzungsorgane', (select id from lab_subcategories where key = 'sex_hormones')),
+  ('fortpflanzungsorgane', (select id from lab_subcategories where key = 'tumor_markers'));
