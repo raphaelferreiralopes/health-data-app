@@ -1,10 +1,10 @@
 import type { Tab } from '@/core/types';
 
 export const TABS: { value: Tab; label: string }[] = [
-  { value: 'blutanalyse', label: 'Blutanalyse' },
-  { value: 'urin', label: 'Urin-Analyse' },
-  { value: 'stuhl', label: 'Stuhl-Analyse' },
-  { value: 'allergie', label: 'Allergie-Analyse' },
+  { value: 'blutanalyse', label: 'Blutdiagnostik' },
+  { value: 'urin', label: 'Urindiagnostik' },
+  { value: 'stuhl', label: 'Stuhldiagnostik' },
+  { value: 'allergie', label: 'Allergiediagnostik' },
 ];
 
 export function isTab(value: string): value is Tab {
