@@ -1,11 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const PUBLIC_PATHS = ['/login'];
+
 /**
- * Refreshes the Supabase session cookie on every request. Server Components
- * can't write cookies (see supabaseServerAuth.ts), so without this, an
- * expired access token would never get refreshed and users would be
- * silently logged out.
+ * Refreshes the Supabase session cookie on every request (Server Components
+ * can't write cookies -- see supabaseServerAuth.ts) and gates every app
+ * route behind login: signed-out visitors are sent to /login, and a
+ * signed-in visitor hitting /login is sent straight into the app.
  */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -29,11 +31,26 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isPublicPath = PUBLIC_PATHS.includes(pathname);
+
+  if (!user && !isPublicPath) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('next', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (user && isPublicPath) {
+    return NextResponse.redirect(new URL('/home', request.url));
+  }
 
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
 };
