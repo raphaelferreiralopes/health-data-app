@@ -103,6 +103,15 @@ export function AnalysisUploadCard() {
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
+
+    if (file && file.type !== 'application/pdf') {
+      setStatusMessage('Bitte nur PDF-Dateien hochladen.');
+      event.target.value = '';
+      setSelectedFile(null);
+      return;
+    }
+
+    setStatusMessage('');
     setSelectedFile(file);
   };
 
@@ -165,7 +174,7 @@ export function AnalysisUploadCard() {
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-700">Analyse-Ergebnisse</p>
             <h1 className="mt-2 text-2xl font-semibold text-slate-900">Ergebnisse einfach sichern</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Speichere deine Befunde manuell, als PDF oder als Foto – direkt in dieser App für einen schnellen Überblick.
+              Speichere deine Befunde manuell oder als PDF – direkt in dieser App für einen schnellen Überblick.
             </p>
           </div>
           <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-sm font-medium text-cyan-700">
@@ -199,10 +208,10 @@ export function AnalysisUploadCard() {
 
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
             <label className="block text-sm font-medium text-slate-700">
-              PDF oder Foto hochladen
+              PDF hochladen
               <input
                 type="file"
-                accept=".pdf,image/*"
+                accept=".pdf,application/pdf"
                 onChange={handleFileChange}
                 className="mt-3 block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-cyan-700"
               />
@@ -259,18 +268,14 @@ export function AnalysisUploadCard() {
 
                 {entry.fileData ? (
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-                    {entry.fileType?.startsWith('image/') ? (
-                      <img src={entry.fileData} alt={entry.fileName ?? entry.title} className="max-h-80 rounded-xl object-contain" />
-                    ) : (
-                      <a
-                        href={entry.fileData}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm font-semibold text-cyan-700 underline"
-                      >
-                        {entry.fileName ?? 'Datei öffnen'}
-                      </a>
-                    )}
+                    <a
+                      href={entry.fileData}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-semibold text-cyan-700 underline"
+                    >
+                      {entry.fileName ?? 'PDF öffnen'}
+                    </a>
                   </div>
                 ) : null}
               </article>
