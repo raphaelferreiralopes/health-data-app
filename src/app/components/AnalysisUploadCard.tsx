@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { getBrowserSupabaseClient } from '@/app/lib/supabaseBrowser';
+import { ConfirmedLabResult, ExtractionMatch, ExtractionReviewSheet } from './ExtractionReviewSheet';
 
 type AnalysisEntry = {
   id: string;
@@ -49,6 +50,9 @@ export function AnalysisUploadCard() {
   const [isReady, setIsReady] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState('');
+  const [extractionMatches, setExtractionMatches] = useState<ExtractionMatch[] | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -108,6 +112,55 @@ export function AnalysisUploadCard() {
 
     setStatusMessage('');
     setSelectedFile(file);
+  };
+
+  const handleExtract = async () => {
+    if (!selectedFile || !accessToken) {
+      return;
+    }
+
+    setExtractionError('');
+    setIsExtracting(true);
+
+    try {
+      const fileData = await readFileAsDataUrl(selectedFile);
+      const response = await fetch('/api/analysis-uploads/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ fileData, fileName: selectedFile.name }),
+      });
+
+      const payload = (await response.json()) as { matches?: ExtractionMatch[]; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'Auslesen fehlgeschlagen.');
+      }
+
+      setExtractionMatches(payload.matches ?? []);
+    } catch (err) {
+      setExtractionError(err instanceof Error ? err.message : 'Auslesen fehlgeschlagen.');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleConfirmExtraction = async (rows: ConfirmedLabResult[]) => {
+    if (!accessToken) {
+      throw new Error('Nicht angemeldet.');
+    }
+
+    const response = await fetch('/api/lab-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ results: rows }),
+    });
+
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      throw new Error(payload.error ?? 'Speichern fehlgeschlagen.');
+    }
+
+    setExtractionMatches(null);
+    setStatusMessage(`${rows.length} Laborwerte übernommen.`);
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -202,6 +255,23 @@ export function AnalysisUploadCard() {
         </label>
         {selectedFile ? <p className="text-xs text-muted">Ausgewählt: {selectedFile.name}</p> : null}
 
+        {selectedFile ? (
+          <div>
+            <button
+              type="button"
+              onClick={handleExtract}
+              disabled={isExtracting || !accessToken}
+              className="self-start rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-60"
+            >
+              {isExtracting ? 'Werte werden ausgelesen…' : 'Werte automatisch auslesen'}
+            </button>
+            {!accessToken ? (
+              <p className="mt-2 text-xs text-muted">Melde dich an, um Werte automatisch auslesen zu lassen.</p>
+            ) : null}
+            {extractionError ? <p className="mt-2 text-sm text-red-600">{extractionError}</p> : null}
+          </div>
+        ) : null}
+
         <button
           type="submit"
           className="mt-2 self-start rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-deep"
@@ -243,6 +313,14 @@ export function AnalysisUploadCard() {
           </div>
         )}
       </div>
+
+      {extractionMatches ? (
+        <ExtractionReviewSheet
+          matches={extractionMatches}
+          onClose={() => setExtractionMatches(null)}
+          onConfirm={handleConfirmExtraction}
+        />
+      ) : null}
     </section>
   );
 }

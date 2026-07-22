@@ -24,7 +24,9 @@ export interface LabParameter {
   name: string;
   abbreviation: string | null;
   unit: string | null;
-  descriptionShort: string;
+  descriptionLevel1: string;
+  descriptionLevel2: string;
+  descriptionLevel3: string;
   /** Placeholder field: swap for a real trusted source per parameter. */
   learnMoreUrl: string;
   resultType: ResultType;

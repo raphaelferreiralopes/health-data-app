@@ -33,8 +33,8 @@ kein Onboarding, kein Auth-UI -- nur die Datenbank-Ansicht.
 lab_categories (id, key, name, tab, sort_order)
 lab_subcategories (id, category_id, key, name, sort_order)
 lab_parameters (id, subcategory_id, key, name, abbreviation, unit,
-                description_short, learn_more_url,
-                result_type [numeric|qualitative], sort_order)
+                description_level1, description_level2, description_level3,
+                learn_more_url, result_type [numeric|qualitative], sort_order)
 lab_reference_ranges (id, parameter_id, min, max, qualitative_normal,
                       gender [m|f|all], age_min, age_max)
 lab_results (id, user_id, parameter_id, value, value_qualitative,

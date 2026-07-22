@@ -1,9 +1,21 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { ParameterWithResult } from '@/core/types';
 import { formatReferenceRange } from '@/core/referenceRange';
 import { StatusBadge } from './StatusBadge';
+
+const LEVELS = [
+  { level: 1, label: 'Einfach' },
+  { level: 2, label: 'Standard' },
+  { level: 3, label: 'Profi' },
+] as const;
+
+function descriptionForLevel(pw: ParameterWithResult, level: 1 | 2 | 3): string {
+  if (level === 1) return pw.parameter.descriptionLevel1;
+  if (level === 3) return pw.parameter.descriptionLevel3;
+  return pw.parameter.descriptionLevel2;
+}
 
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -18,6 +30,8 @@ function formatValue(pw: ParameterWithResult): string {
 }
 
 export function ParameterDetailSheet({ pw, onClose }: { pw: ParameterWithResult; onClose: () => void }) {
+  const [level, setLevel] = useState<1 | 2 | 3>(2);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -62,7 +76,24 @@ export function ParameterDetailSheet({ pw, onClose }: { pw: ParameterWithResult;
           <dd className="text-ink">{formatDate(pw.result.measuredAt)}</dd>
         </dl>
 
-        <p className="mt-4 text-sm leading-relaxed text-ink/80">{pw.parameter.descriptionShort}</p>
+        <div className="mt-4 inline-flex rounded-lg bg-card p-1" role="tablist" aria-label="Erklärungsstufe">
+          {LEVELS.map(({ level: l, label }) => (
+            <button
+              key={l}
+              type="button"
+              role="tab"
+              aria-selected={level === l}
+              onClick={() => setLevel(l)}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                level === l ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <p className="mt-3 text-sm leading-relaxed text-ink/80">{descriptionForLevel(pw, level)}</p>
 
         {pw.parameter.learnMoreUrl && (
           <a
