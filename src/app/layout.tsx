@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "vitalis",
+  title: "longevitystack",
   description: "Kenn dich. Von innen.",
 };
 

@@ -1,7 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login'];
+// Reachable without a session. /datenschutz stays reachable for signed-in
+// users too (unlike /login, which redirects them straight into the app) --
+// see the two separate checks below.
+const PUBLIC_PATHS = ['/login', '/datenschutz'];
+const LOGGED_OUT_ONLY_PATHS = ['/login'];
 
 /**
  * Refreshes the Supabase session cookie on every request (Server Components
@@ -44,7 +48,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && isPublicPath) {
+  if (user && LOGGED_OUT_ONLY_PATHS.includes(pathname)) {
     return NextResponse.redirect(new URL('/home', request.url));
   }
 

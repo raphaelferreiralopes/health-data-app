@@ -8,7 +8,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl items-center gap-2.5 px-4 py-4 sm:px-6">
           <LogoMark className="h-6 w-6" />
-          <span className="text-xl font-light tracking-tight text-ink">vitalis</span>
+          <span className="text-xl font-light tracking-tight text-ink">longevitystack</span>
           <span className="hidden text-sm text-muted sm:inline">— Kenn dich. Von innen.</span>
         </div>
         <div className="pb-3">
@@ -19,6 +19,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {children}
+      <footer className="mt-auto border-t border-line px-4 py-6 text-center sm:px-6">
+        <a href="/datenschutz" className="text-xs text-muted hover:text-ink">
+          Datenschutz &amp; Hinweise
+        </a>
+      </footer>
     </>
   );
 }

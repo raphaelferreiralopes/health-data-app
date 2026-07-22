@@ -14,12 +14,18 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [hasConsented, setHasConsented] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setMessage('');
+
+    if (mode === 'signup' && !hasConsented) {
+      setMessage('Bitte bestätige den Hinweis zu Datenschutz und Gesundheitsdaten.');
+      return;
+    }
 
     const client = getBrowserSupabaseClient();
     if (!client) {
@@ -74,7 +80,7 @@ function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-2.5 text-center">
           <LogoMark className="h-8 w-8" />
-          <span className="text-2xl font-light tracking-tight text-ink">vitalis</span>
+          <span className="text-2xl font-light tracking-tight text-ink">longevitystack</span>
           <span className="text-sm text-muted">Kenn dich. Von innen.</span>
         </div>
 
@@ -127,6 +133,24 @@ function LoginForm() {
               className="rounded-xl border border-line bg-card px-4 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:bg-surface"
             />
 
+            {mode === 'signup' ? (
+              <label className="flex items-start gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={hasConsented}
+                  onChange={(event) => setHasConsented(event.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Ich habe die{' '}
+                  <a href="/datenschutz" target="_blank" rel="noreferrer" className="font-medium text-brand hover:text-brand-deep">
+                    Datenschutz- und Gesundheitshinweise
+                  </a>{' '}
+                  gelesen und bin einverstanden, dass meine Gesundheitsdaten hier zu Testzwecken gespeichert werden.
+                </span>
+              </label>
+            ) : null}
+
             <button
               type="submit"
               disabled={isSubmitting}
@@ -138,6 +162,12 @@ function LoginForm() {
 
           {message ? <p className="mt-4 text-sm text-brand-deep">{message}</p> : null}
         </div>
+
+        <p className="mt-6 text-center text-xs text-muted">
+          <a href="/datenschutz" className="hover:text-ink">
+            Datenschutz &amp; Hinweise
+          </a>
+        </p>
       </div>
     </main>
   );
