@@ -1,9 +1,9 @@
-import { TabNav } from '@/app/components/TabNav';
+import { DatenbankSectionNav } from '@/app/components/DatenbankSectionNav';
 
 export default function DatenbankLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <TabNav />
+      <DatenbankSectionNav />
       {children}
     </>
   );

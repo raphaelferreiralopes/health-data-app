@@ -10,7 +10,7 @@ export function TabNav() {
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-line px-4 sm:px-6" aria-label="Datenkategorien">
       {TABS.map((tab) => {
-        const href = `/datenbank/${tab.value}`;
+        const href = `/datenbank/diagnostik/${tab.value}`;
         const isActive = pathname === href;
         return (
           <Link
