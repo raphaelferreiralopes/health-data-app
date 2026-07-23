@@ -56,8 +56,8 @@ export default function DatenschutzPage() {
               <strong className="text-ink">Supabase</strong> -- Hosting von Datenbank, Datei-Uploads und Login.
             </li>
             <li>
-              <strong className="text-ink">Anthropic</strong> -- nur wenn du aktiv &bdquo;Werte automatisch auslesen&ldquo; nutzt,
-              wird das jeweilige Dokument zur Auswertung an die Anthropic-API geschickt.
+              <strong className="text-ink">Google (Gemini API)</strong> -- nur wenn du aktiv &bdquo;Werte automatisch auslesen&ldquo; nutzt,
+              wird das jeweilige Dokument zur Auswertung an die Gemini-API geschickt.
             </li>
           </ul>
         </div>

@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
+import { Type } from '@google/genai';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
-import { getAnthropicServerClient } from '@/app/lib/anthropicServer';
+import { getGeminiServerClient } from '@/app/lib/geminiServer';
 import { MAX_UPLOAD_PDF_BYTES, parsePdfDataUrl } from '../shared';
 
-// Cost guardrails for the Anthropic API call this route makes. Both are
-// deliberately tight: worst case is roughly
-// DAILY_EXTRACTION_LIMIT * (MAX_UPLOAD_PDF_BYTES worth of document tokens +
-// the parameter-catalog prompt + MAX_OUTPUT_TOKENS), which on Haiku pricing
-// stays in the low cents per user per day even at the ceiling.
+// Guardrails for the Gemini API call this route makes. Gemini's free tier is
+// rate-limited (requests/day and requests/minute), so a per-user daily cap
+// keeps one account from exhausting the shared quota for everyone else.
 const DAILY_EXTRACTION_LIMIT = 10;
 const MAX_OUTPUT_TOKENS = 2048;
-const MODEL = 'claude-haiku-4-5';
+const MODEL = 'gemini-2.5-flash';
 
 type ExtractPayload = {
   fileData?: string;
@@ -46,25 +45,23 @@ function buildCatalogText(parameters: LabParameterRow[]): string {
 
 function buildSchema(validKeys: string[]) {
   return {
-    type: 'object',
+    type: Type.OBJECT,
     properties: {
       results: {
-        type: 'array',
+        type: Type.ARRAY,
         items: {
-          type: 'object',
+          type: Type.OBJECT,
           properties: {
-            parameter_key: { type: 'string', enum: validKeys },
-            value_numeric: { type: ['number', 'null'] },
-            value_qualitative: { type: ['string', 'null'] },
-            measured_at: { type: ['string', 'null'] },
+            parameter_key: { type: Type.STRING, enum: validKeys },
+            value_numeric: { type: Type.NUMBER, nullable: true },
+            value_qualitative: { type: Type.STRING, nullable: true },
+            measured_at: { type: Type.STRING, nullable: true },
           },
           required: ['parameter_key', 'value_numeric', 'value_qualitative', 'measured_at'],
-          additionalProperties: false,
         },
       },
     },
     required: ['results'],
-    additionalProperties: false,
   } as const;
 }
 
@@ -118,23 +115,18 @@ export async function POST(request: Request) {
   const parameters = (parameterRows ?? []) as LabParameterRow[];
   const parameterByKey = new Map(parameters.map((p) => [p.key, p]));
 
-  let response;
+  let responseText: string | undefined;
+  let usage = { input_tokens: 0, output_tokens: 0 };
   try {
-    const anthropic = getAnthropicServerClient();
-    response = await anthropic.messages.parse({
+    const gemini = getGeminiServerClient();
+    const response = await gemini.models.generateContent({
       model: MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system:
-        'Du extrahierst Laborwerte aus medizinischen Befund-PDFs für eine Gesundheits-App. ' +
-        'Nutze ausschließlich die "key"-Werte aus dem bereitgestellten Katalog. ' +
-        'Erfinde keine Werte, die nicht im Dokument stehen, und rate nicht.',
-      messages: [
+      contents: [
         {
           role: 'user',
-          content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+          parts: [
+            { inlineData: { mimeType: 'application/pdf', data: base64 } },
             {
-              type: 'text',
               text:
                 `Katalog bekannter Laborparameter (key | Name | Werttyp | Einheit):\n${buildCatalogText(parameters)}\n\n` +
                 'Lies das angehängte PDF und extrahiere alle Werte, die zu einem der obigen Parameter passen. ' +
@@ -147,15 +139,34 @@ export async function POST(request: Request) {
           ],
         },
       ],
-      output_config: { format: { type: 'json_schema', schema: buildSchema(parameters.map((p) => p.key)) } },
+      config: {
+        systemInstruction:
+          'Du extrahierst Laborwerte aus medizinischen Befund-PDFs für eine Gesundheits-App. ' +
+          'Nutze ausschließlich die "key"-Werte aus dem bereitgestellten Katalog. ' +
+          'Erfinde keine Werte, die nicht im Dokument stehen, und rate nicht.',
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        responseMimeType: 'application/json',
+        responseSchema: buildSchema(parameters.map((p) => p.key)),
+      },
     });
+
+    responseText = response.text;
+    usage = {
+      input_tokens: response.usageMetadata?.promptTokenCount ?? 0,
+      output_tokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+    };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Anfrage an Claude fehlgeschlagen.';
+    const message = error instanceof Error ? error.message : 'Anfrage an Gemini fehlgeschlagen.';
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  const parsed = response.parsed_output as { results?: ExtractedResult[] } | null;
-  const rawResults = parsed?.results ?? [];
+  let rawResults: ExtractedResult[] = [];
+  try {
+    const parsed = responseText ? (JSON.parse(responseText) as { results?: ExtractedResult[] }) : null;
+    rawResults = parsed?.results ?? [];
+  } catch {
+    return NextResponse.json({ error: 'Antwort von Gemini konnte nicht gelesen werden.' }, { status: 502 });
+  }
 
   const matches = rawResults
     .map((item) => {
@@ -178,8 +189,8 @@ export async function POST(request: Request) {
 
   await supabase.from('pdf_extractions').insert({
     user_id: userId,
-    input_tokens: response.usage.input_tokens,
-    output_tokens: response.usage.output_tokens,
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
     matched_count: matches.length,
   });
 
