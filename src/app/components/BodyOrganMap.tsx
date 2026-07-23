@@ -2,92 +2,7 @@
 
 import { useState } from 'react';
 import { OrganSheet } from './OrganSheet';
-
-type Organ = {
-  id: string;
-  name: string;
-};
-
-type Marker = {
-  organId: string;
-  /** Position in % of the body illustration's bounding box. */
-  top: number;
-  left: number;
-};
-
-type System = {
-  name: string;
-  organIds: string[];
-};
-
-const ORGANS: Organ[] = [
-  { id: 'herz', name: 'Herz' },
-  { id: 'lunge', name: 'Lunge' },
-  { id: 'blutgefaesse', name: 'Blutgefäße' },
-  { id: 'leber', name: 'Leber' },
-  { id: 'magen', name: 'Magen' },
-  { id: 'duenndarm', name: 'Dünndarm' },
-  { id: 'dickdarm', name: 'Dickdarm' },
-  { id: 'pankreas', name: 'Bauchspeicheldrüse' },
-  { id: 'gallenblase', name: 'Gallenblase' },
-  { id: 'speiseroehre', name: 'Speiseröhre' },
-  { id: 'niere', name: 'Nieren' },
-  { id: 'harnblase', name: 'Harnblase' },
-  { id: 'gehirn', name: 'Gehirn' },
-  { id: 'rueckenmark', name: 'Rückenmark' },
-  { id: 'schilddruese', name: 'Schilddrüse' },
-  { id: 'nebenniere', name: 'Nebennieren' },
-  { id: 'milz', name: 'Milz' },
-  { id: 'lymphsystem', name: 'Lymphknoten/Lymphsystem' },
-  { id: 'haut', name: 'Haut' },
-  { id: 'fortpflanzungsorgane', name: 'Fortpflanzungsorgane' },
-];
-
-const SYSTEMS: System[] = [
-  { name: 'Kreislauf- und Atmungssystem', organIds: ['herz', 'lunge', 'blutgefaesse'] },
-  {
-    name: 'Verdauungssystem',
-    organIds: ['leber', 'magen', 'duenndarm', 'dickdarm', 'pankreas', 'gallenblase', 'speiseroehre'],
-  },
-  { name: 'Ausscheidungssystem', organIds: ['niere', 'harnblase'] },
-  { name: 'Nervensystem', organIds: ['gehirn', 'rueckenmark'] },
-  { name: 'Hormonsystem', organIds: ['schilddruese', 'nebenniere'] },
-  { name: 'Immunsystem', organIds: ['milz', 'lymphsystem'] },
-  { name: 'Sonstige lebenswichtige Organe', organIds: ['haut', 'fortpflanzungsorgane'] },
-];
-
-// Positions are tuned by eye against the body illustration's viewBox below.
-// Paired organs (Lunge, Nieren, Nebennieren) get two markers pointing at the
-// same organ id.
-const MARKERS: Marker[] = [
-  { organId: 'gehirn', top: 7.7, left: 50 },
-  { organId: 'rueckenmark', top: 14.5, left: 50 },
-  { organId: 'schilddruese', top: 18.2, left: 50 },
-  { organId: 'speiseroehre', top: 21.8, left: 50 },
-  { organId: 'lunge', top: 24.1, left: 39 },
-  { organId: 'lunge', top: 24.1, left: 61 },
-  { organId: 'herz', top: 28.2, left: 50 },
-  { organId: 'lymphsystem', top: 29.5, left: 72.5 },
-  { organId: 'blutgefaesse', top: 34.1, left: 25 },
-  { organId: 'leber', top: 36.8, left: 40 },
-  { organId: 'magen', top: 36.4, left: 60 },
-  { organId: 'milz', top: 38.6, left: 70 },
-  { organId: 'nebenniere', top: 39.5, left: 34 },
-  { organId: 'nebenniere', top: 39.5, left: 66 },
-  { organId: 'pankreas', top: 40.9, left: 50 },
-  { organId: 'gallenblase', top: 42.7, left: 45 },
-  { organId: 'niere', top: 44.8, left: 32 },
-  { organId: 'niere', top: 44.8, left: 68 },
-  { organId: 'duenndarm', top: 47.7, left: 50 },
-  { organId: 'dickdarm', top: 51.8, left: 44 },
-  { organId: 'harnblase', top: 54.5, left: 56 },
-  { organId: 'fortpflanzungsorgane', top: 56.4, left: 50 },
-  { organId: 'haut', top: 68.2, left: 60.5 },
-];
-
-function organName(organId: string): string {
-  return ORGANS.find((o) => o.id === organId)?.name ?? organId;
-}
+import { MARKERS, SYSTEMS, organName } from './biomarkerMapData';
 
 function BodySilhouette() {
   return (
@@ -154,7 +69,7 @@ export function BodyOrganMap() {
       </div>
 
       {selectedOrganId ? (
-        <OrganSheet organName={organName(selectedOrganId)} onClose={() => setSelectedOrganId(null)} />
+        <OrganSheet organId={selectedOrganId} onClose={() => setSelectedOrganId(null)} />
       ) : null}
     </div>
   );
