@@ -10,7 +10,7 @@ import { MAX_UPLOAD_PDF_BYTES, parsePdfDataUrl } from '../shared';
 // keeps one account from exhausting the shared quota for everyone else.
 const DAILY_EXTRACTION_LIMIT = 10;
 const MAX_OUTPUT_TOKENS = 2048;
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-3.1-flash-lite';
 
 type ExtractPayload = {
   fileData?: string;
