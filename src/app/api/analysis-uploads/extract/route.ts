@@ -3,6 +3,7 @@ import { Type } from '@google/genai';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
 import { getGeminiServerClient } from '@/app/lib/geminiServer';
+import { serverError } from '@/app/lib/apiError';
 import { MAX_UPLOAD_PDF_BYTES, parsePdfDataUrl } from '../shared';
 
 // Guardrails for the Gemini API call this route makes. Gemini's free tier is
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
     .gte('created_at', since);
 
   if (countError) {
-    return NextResponse.json({ error: countError.message }, { status: 500 });
+    return serverError('extract rate-limit check failed', countError);
   }
   if ((recentCount ?? 0) >= DAILY_EXTRACTION_LIMIT) {
     return NextResponse.json(
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
     .select('id, key, name, abbreviation, unit, result_type');
 
   if (parameterError) {
-    return NextResponse.json({ error: parameterError.message }, { status: 500 });
+    return serverError('extract parameter catalog lookup failed', parameterError);
   }
 
   const parameters = (parameterRows ?? []) as LabParameterRow[];
@@ -171,8 +172,9 @@ export async function POST(request: Request) {
       );
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Anfrage an Gemini fehlgeschlagen.';
-    return NextResponse.json({ error: message }, { status: 502 });
+    const message = error instanceof Error ? error.message : 'unknown error';
+    console.error('Gemini extraction request failed', { userId, message });
+    return NextResponse.json({ error: 'Anfrage an Gemini fehlgeschlagen.' }, { status: 502 });
   }
 
   let rawResults: ExtractedResult[] = [];

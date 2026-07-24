@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
+import { serverError } from '@/app/lib/apiError';
 import { toBodyCheckEntry, type BodyCheckPhase, type BodyCheckRow, type FamilyHistoryPayload } from '../shared';
 
 type PatchPayload = Partial<{
@@ -48,7 +49,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError('body-checks update failed', error);
   }
 
   return NextResponse.json({ entry: toBodyCheckEntry(data as BodyCheckRow) });

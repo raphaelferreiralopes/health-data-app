@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
+import { serverError } from '@/app/lib/apiError';
 
 // Every table that stores rows keyed by user_id -- kept as an explicit list
 // (rather than relying only on FK cascades) so this stays correct even if a
@@ -33,13 +34,13 @@ export async function DELETE(request: Request) {
   for (const table of USER_DATA_TABLES) {
     const { error } = await supabase.from(table).delete().eq('user_id', userId);
     if (error) {
-      return NextResponse.json({ error: `Löschen fehlgeschlagen (${table}): ${error.message}` }, { status: 500 });
+      return serverError(`account delete failed (${table})`, error);
     }
   }
 
   const { error: authError } = await supabase.auth.admin.deleteUser(userId);
   if (authError) {
-    return NextResponse.json({ error: `Konto konnte nicht gelöscht werden: ${authError.message}` }, { status: 500 });
+    return serverError('account auth delete failed', authError);
   }
 
   return NextResponse.json({ deleted: true });

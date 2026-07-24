@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
+import { isWithinRateLimit } from '@/app/lib/rateLimit';
+import { serverError } from '@/app/lib/apiError';
 import { toBodyCheckEntry, type BodyCheckPhase, type BodyCheckRow, type FamilyHistoryPayload } from './shared';
+
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const RATE_LIMIT_MAX_DRAFTS = 10;
 
 type BodyCheckPayload = Partial<{
   heightCm: number | null;
@@ -42,10 +47,10 @@ export async function GET(request: Request) {
   ]);
 
   if (draftError) {
-    return NextResponse.json({ error: draftError.message }, { status: 500 });
+    return serverError('body-checks draft lookup failed', draftError);
   }
   if (completedError) {
-    return NextResponse.json({ error: completedError.message }, { status: 500 });
+    return serverError('body-checks completed lookup failed', completedError);
   }
 
   return NextResponse.json({
@@ -61,6 +66,19 @@ export async function POST(request: Request) {
 
   if (!userId) {
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 });
+  }
+
+  const withinLimit = await isWithinRateLimit(supabase, {
+    table: 'body_checks',
+    userId,
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: RATE_LIMIT_MAX_DRAFTS,
+  });
+  if (!withinLimit) {
+    return NextResponse.json(
+      { error: `Zu viele neue Body-Checks. Bitte versuche es in einer Stunde erneut (max. ${RATE_LIMIT_MAX_DRAFTS} pro Stunde).` },
+      { status: 429 },
+    );
   }
 
   const body = (await request.json()) as BodyCheckPayload;
@@ -81,7 +99,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.from('body_checks').insert(payload).select('*').single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError('body-checks insert failed', error);
   }
 
   return NextResponse.json({ entry: toBodyCheckEntry(data as BodyCheckRow) });

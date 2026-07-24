@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
+import { serverError } from '@/app/lib/apiError';
+import { isProcessStageStatus } from '@/core/processStages';
 import { toRecommendedTestEntry, type RecommendedTestRow, type RecommendedTestStatus } from '../shared';
 
 type PatchPayload = { status: RecommendedTestStatus };
@@ -15,7 +17,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 });
   }
 
-  const body = (await request.json()) as PatchPayload;
+  const body = (await request.json()) as Partial<PatchPayload>;
+
+  if (!isProcessStageStatus(body.status)) {
+    return NextResponse.json({ error: 'Ungültiger Status' }, { status: 400 });
+  }
 
   const { data, error } = await supabase
     .from('recommended_tests')
@@ -26,7 +32,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError('recommended-tests update failed', error);
   }
 
   return NextResponse.json({ entry: toRecommendedTestEntry(data as RecommendedTestRow) });

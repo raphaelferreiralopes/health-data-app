@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
+import { isWithinRateLimit } from '@/app/lib/rateLimit';
+import { serverError } from '@/app/lib/apiError';
 import { MAX_UPLOAD_PDF_BYTES, parsePdfDataUrl } from './shared';
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_NOTES_LENGTH = 10_000;
 const MAX_FILE_NAME_LENGTH = 255;
+// Uploads can carry an 8 MB PDF each -- caps storage/cost abuse from a single
+// (possibly compromised) account rather than blocking normal usage.
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const RATE_LIMIT_MAX_UPLOADS = 20;
 
 type AnalysisUploadPayload = {
   title: string;
@@ -42,7 +48,7 @@ export async function GET(request: Request) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError('analysis-uploads list failed', error);
   }
 
   return NextResponse.json({ entries: (data ?? []).map((item) => ({
@@ -62,6 +68,19 @@ export async function POST(request: Request) {
 
   if (!userId) {
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 });
+  }
+
+  const withinLimit = await isWithinRateLimit(supabase, {
+    table: 'analysis_uploads',
+    userId,
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: RATE_LIMIT_MAX_UPLOADS,
+  });
+  if (!withinLimit) {
+    return NextResponse.json(
+      { error: `Zu viele Uploads. Bitte versuche es in einer Stunde erneut (max. ${RATE_LIMIT_MAX_UPLOADS} pro Stunde).` },
+      { status: 429 },
+    );
   }
 
   const body = (await request.json()) as Partial<AnalysisUploadPayload>;
@@ -117,7 +136,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError('analysis-uploads insert failed', error);
   }
 
   const row = data as AnalysisUploadRow;

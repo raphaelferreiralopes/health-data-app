@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
+import { serverError } from '@/app/lib/apiError';
 
 type ProfileRow = {
   gender: 'm' | 'f';
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError('profile lookup failed', error);
   }
 
   return NextResponse.json({ profile: data ? toProfile(data as ProfileRow) : null });
@@ -67,7 +68,7 @@ export async function PUT(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError('profile upsert failed', error);
   }
 
   return NextResponse.json({ profile: toProfile(data as ProfileRow) });

@@ -19,3 +19,8 @@ export const PROCESS_STAGE_LABELS: Record<ProcessStageStatus, string> = {
 export function processStageIndex(status: ProcessStageStatus): number {
   return PROCESS_STAGES.indexOf(status);
 }
+
+/** Runtime guard for status values coming from a request body -- the TS type alone isn't checked at runtime. */
+export function isProcessStageStatus(value: unknown): value is ProcessStageStatus {
+  return typeof value === 'string' && value in PROCESS_STAGE_LABELS;
+}

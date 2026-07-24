@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
+import { serverError } from '@/app/lib/apiError';
 import { RECOMMENDED_TEST_KEY_ORDER, planRecommendedTests, toRecommendedTestEntry, type RecommendedTestRow } from './shared';
 
 /**
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     .maybeSingle();
 
   if (bodyCheckError) {
-    return NextResponse.json({ error: bodyCheckError.message }, { status: 500 });
+    return serverError('recommended-tests bodyCheck lookup failed', bodyCheckError);
   }
   if (!bodyCheck) {
     return NextResponse.json({ bodyCheckId: null, tests: [] });
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
     .eq('body_check_id', bodyCheck.id);
 
   if (existingError) {
-    return NextResponse.json({ error: existingError.message }, { status: 500 });
+    return serverError('recommended-tests existing lookup failed', existingError);
   }
 
   let rows = existingRows as RecommendedTestRow[];
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
       .select('*');
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      return serverError('recommended-tests backfill insert failed', insertError);
     }
     rows = [...rows, ...(inserted as RecommendedTestRow[])];
   }
