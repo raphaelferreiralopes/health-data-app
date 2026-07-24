@@ -7,7 +7,15 @@ import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
 // future table's cascade rule is misconfigured. recommended_tests also
 // cascades from body_checks via its FK, deleting it here too is redundant
 // but harmless.
-const USER_DATA_TABLES = ['lab_results', 'analysis_uploads', 'pdf_extractions', 'recommended_tests', 'processes', 'body_checks'] as const;
+const USER_DATA_TABLES = [
+  'lab_results',
+  'analysis_uploads',
+  'pdf_extractions',
+  'recommended_tests',
+  'processes',
+  'body_checks',
+  'profiles',
+] as const;
 
 /**
  * Permanently deletes the signed-in user's data (GDPR Art. 17 -- right to

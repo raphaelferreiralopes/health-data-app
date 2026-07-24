@@ -9,7 +9,10 @@ import { MAX_UPLOAD_PDF_BYTES, parsePdfDataUrl } from '../shared';
 // rate-limited (requests/day and requests/minute), so a per-user daily cap
 // keeps one account from exhausting the shared quota for everyone else.
 const DAILY_EXTRACTION_LIMIT = 10;
-const MAX_OUTPUT_TOKENS = 2048;
+// Structured JSON output for a full-panel PDF (30+ Parameter) easily runs to
+// a few thousand tokens -- 2048 was too tight and silently truncated the
+// JSON mid-array, which surfaced as a generic parse error to the user.
+const MAX_OUTPUT_TOKENS = 8192;
 const MODEL = 'gemini-3.1-flash-lite';
 
 type ExtractPayload = {
@@ -155,6 +158,18 @@ export async function POST(request: Request) {
       input_tokens: response.usageMetadata?.promptTokenCount ?? 0,
       output_tokens: response.usageMetadata?.candidatesTokenCount ?? 0,
     };
+
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (finishReason === 'MAX_TOKENS') {
+      console.error('Gemini extraction hit MAX_TOKENS', { userId, outputTokens: usage.output_tokens });
+      return NextResponse.json(
+        {
+          error:
+            'Das PDF enthält zu viele Werte für eine einzelne automatische Auswertung. Bitte in kleineren Abschnitten hochladen oder die Werte manuell eintragen.',
+        },
+        { status: 502 },
+      );
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Anfrage an Gemini fehlgeschlagen.';
     return NextResponse.json({ error: message }, { status: 502 });
@@ -162,9 +177,16 @@ export async function POST(request: Request) {
 
   let rawResults: ExtractedResult[] = [];
   try {
-    const parsed = responseText ? (JSON.parse(responseText) as { results?: ExtractedResult[] }) : null;
+    // Some models wrap JSON output in markdown code fences even with
+    // responseMimeType/responseSchema set -- strip defensively before parsing.
+    const cleaned = responseText?.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+    const parsed = cleaned ? (JSON.parse(cleaned) as { results?: ExtractedResult[] }) : null;
     rawResults = parsed?.results ?? [];
   } catch {
+    console.error('Gemini extraction: failed to parse response as JSON', {
+      userId,
+      responseText: responseText?.slice(0, 500),
+    });
     return NextResponse.json({ error: 'Antwort von Gemini konnte nicht gelesen werden.' }, { status: 502 });
   }
 
