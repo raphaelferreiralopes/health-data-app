@@ -20,7 +20,17 @@ Zur Einordnung, damit alte und neue Befunde nicht doppelt auftauchen:
 - ✅ Security-Header ergänzt (`next.config.ts`): CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy.
 - ✅ Laufzeit-Validierung von Status-Enums ergänzt (`isProcessStageStatus`, analog für Medikamente/Kategorien).
 - ✅ Der als "toter Code" markierte `DEMO_USER_ID`-Fallback in `[tab]/page.tsx` ist inzwischen umgebaut: Die Seite redirectet jetzt hart auf `/login`, wenn keine Session vorliegt; ein Default-Profil (`DEFAULT_PROFILE`) wird nur noch als Demografie-Platzhalter für angemeldete Nutzer ohne ausgefülltes Profil verwendet, nicht mehr als Auth-Fallback.
-- ⚠️ **Weiterhin offen/nicht verifizierbar:** Der letzte Audit hatte empfohlen, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY` und `VERCEL_OIDC_TOKEN` zu rotieren, weil sie in jener Konversation im Klartext angezeigt wurden. Diese Session hat `.env.local` nicht erneut gelesen und kann daher **nicht bestätigen, ob die Rotation stattgefunden hat**. Bitte manuell verifizieren.
+- ✅ Rotation von `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY` und `VERCEL_OIDC_TOKEN` ist laut Nutzerangabe (2026-07-25) erfolgt. Aus dem Code heraus nicht unabhängig verifizierbar, aber als erledigt vermerkt.
+
+---
+
+## Update 2026-07-25 — im Laufe dieses Audits behoben
+
+Der unten unter Kategorie 7 beschriebene Hauptbefund (unvollständige Account-Löschung) wurde noch am selben Tag gefixt, direkt im Anschluss an diesen Audit-Lauf:
+
+- ✅ `medications` und `medication_intake_logs` sind jetzt Teil von `USER_DATA_TABLES` in [src/app/api/account/route.ts](src/app/api/account/route.ts) (Commit `d6ad460`). "Konto löschen" entfernt damit wieder wirklich alle Daten, wie in der Datenschutzerklärung zugesagt.
+
+Die Detailbeschreibung unter Kategorie 7 bleibt unten stehen (inkl. Code-Referenzen), ist aber als **behoben** markiert statt entfernt, damit der Bericht nachvollziehbar bleibt.
 
 ---
 
@@ -34,11 +44,11 @@ Zur Einordnung, damit alte und neue Befunde nicht doppelt auftauchen:
 | 4 | Input-Validierung & Injection | 🟡 Verbesserungswürdig | Mittel |
 | 5 | API-Sicherheit | 🟡 Verbesserungswürdig | Mittel |
 | 6 | Abhängigkeiten (Dependencies) | 🟡 Verbesserungswürdig | Mittel |
-| 7 | Datenverarbeitung & Datenschutz | 🔴 Kritisch | **Hoch** |
+| 7 | Datenverarbeitung & Datenschutz | 🟢 In Ordnung *(war 🔴, behoben am 2026-07-25)* | Niedrig |
 | 8 | Infrastruktur & Deployment-Konfiguration | 🟡 Verbesserungswürdig | Mittel |
 | 9 | Business-Logic-Risiken | 🟢 In Ordnung | Niedrig |
 
-**Größter Einzelbefund (neu, noch nicht im letzten Audit):** Die Account-Löschung ist unvollständig (Kategorie 7) — die neuen Tabellen `medications` und `medication_intake_logs` fehlen in der Lösch-Routine, wodurch Gesundheitsdaten nach "Konto löschen" entgegen der expliziten Zusage in der Datenschutzerklärung erhalten bleiben.
+**Größter Einzelbefund — behoben am 2026-07-25:** Die Account-Löschung war unvollständig (Kategorie 7) — die neuen Tabellen `medications` und `medication_intake_logs` fehlten in der Lösch-Routine, wodurch Gesundheitsdaten nach "Konto löschen" entgegen der expliziten Zusage in der Datenschutzerklärung erhalten geblieben wären. Noch am selben Tag gefixt (Commit `d6ad460`).
 
 ---
 
@@ -51,9 +61,9 @@ Zur Einordnung, damit alte und neue Befunde nicht doppelt auftauchen:
 - `.gitignore` schließt `.env*` korrekt aus (mit expliziter Ausnahme für `.env.local.example`).
 - Git-Historie geprüft (`git log --all --diff-filter=A -- '.env*'`, `git rev-list --objects --all | grep env`): Es wurde nie eine echte `.env`-Datei committed, nur die Vorlage `.env.local.example` mit Platzhaltern (`xxxxxxxxxxxx`).
 - `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` sind bewusst öffentlich (by design bei Supabase, RLS schützt dahinter) — korrekt kommentiert in `.env.local.example`.
-- Siehe oben ("Seit dem letzten Audit behoben"): Rotation der zuvor im Chat sichtbaren Keys ist aus dem Code heraus nicht verifizierbar — bitte manuell bestätigen.
+- Rotation der zuvor im Chat sichtbaren Keys (`SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `VERCEL_OIDC_TOKEN`) ist laut Nutzerangabe (2026-07-25) erfolgt. Aus dem Code heraus nicht unabhängig verifizierbar, aber als erledigt vermerkt.
 
-**Was für 🟢 nötig wäre:** Manuell bestätigen, dass die 2026-07-24 empfohlene Rotation von `SUPABASE_SERVICE_ROLE_KEY`/`GEMINI_API_KEY`/`VERCEL_OIDC_TOKEN` stattgefunden hat. Perspektivisch ein Secret-Scanning-Tool (z. B. `gitleaks`) in einer CI-Pipeline ergänzen (siehe Kategorie 8), um zukünftige versehentliche Commits automatisch zu verhindern.
+**Was für 🟢 nötig wäre:** Bereits erreicht. Perspektivisch optional: ein Secret-Scanning-Tool (z. B. `gitleaks`) in einer CI-Pipeline ergänzen (siehe Kategorie 8), um zukünftige versehentliche Commits automatisch zu verhindern.
 
 ---
 
@@ -148,16 +158,18 @@ Verifiziert: `next@16.2.11` ist aktuell die **neueste stabile** Next.js-Version 
 
 ---
 
-## 7. Datenverarbeitung & Datenschutz — 🔴 Kritisch (Priorität: Hoch)
+## 7. Datenverarbeitung & Datenschutz — 🟢 In Ordnung (Priorität: Niedrig) — *war 🔴 Kritisch, behoben am 2026-07-25*
 
-**Hauptbefund — unvollständige Account-Löschung:**
-`DELETE /api/account` ([src/app/api/account/route.ts:10-18](src/app/api/account/route.ts#L10-L18)) definiert `USER_DATA_TABLES` als feste Liste:
+**Hauptbefund — unvollständige Account-Löschung — ✅ BEHOBEN (Commit `d6ad460`):**
+`DELETE /api/account` ([src/app/api/account/route.ts:10-18](src/app/api/account/route.ts#L10-L18)) definierte `USER_DATA_TABLES` als feste Liste:
 ```
 lab_results, analysis_uploads, pdf_extractions, recommended_tests, processes, body_checks, profiles
 ```
-Die Tabellen **`medications`** und **`medication_intake_logs`** (Migrationen `0016`/`0017`, Feature "Medikamente/Supplements") fehlen in dieser Liste. Da in keiner Migration ein `ON DELETE CASCADE` über eine Foreign Key zu `auth.users` existiert (verifiziert: kein `references auth.users` in irgendeiner Migration), werden diese Zeilen bei einer Account-Löschung **nicht** entfernt. Nach "Konto löschen" verbleiben dauerhaft: Namen von Medikamenten/Supplements, Dosierungs-/Beschreibungstexte und tägliche Einnahme-Logs — allesamt Gesundheitsdaten (Art. 9 DSGVO).
+Die Tabellen **`medications`** und **`medication_intake_logs`** (Migrationen `0016`/`0017`, Feature "Medikamente/Supplements") fehlten in dieser Liste. Da in keiner Migration ein `ON DELETE CASCADE` über eine Foreign Key zu `auth.users` existiert (verifiziert: kein `references auth.users` in irgendeiner Migration), wurden diese Zeilen bei einer Account-Löschung **nicht** entfernt. Nach "Konto löschen" wären dauerhaft verblieben: Namen von Medikamenten/Supplements, Dosierungs-/Beschreibungstexte und tägliche Einnahme-Logs — allesamt Gesundheitsdaten (Art. 9 DSGVO).
 
-Das widerspricht direkt der eigenen Zusage in der Datenschutzerklärung: [src/app/datenschutz/page.tsx:74-75](src/app/datenschutz/page.tsx#L74-L75) — *"Ein „Konto löschen" findest du oben rechts in der App -- das entfernt sofort und unwiderruflich **alle** deine Daten."* Diese Aussage ist aktuell **faktisch falsch** und stellt sowohl eine Verletzung von Art. 17 DSGVO (Recht auf Löschung) als auch eine irreführende Angabe in der eigenen Datenschutzerklärung dar (Art. 12/13).
+Das widersprach direkt der eigenen Zusage in der Datenschutzerklärung: [src/app/datenschutz/page.tsx:74-75](src/app/datenschutz/page.tsx#L74-L75) — *"Ein „Konto löschen" findest du oben rechts in der App -- das entfernt sofort und unwiderruflich **alle** deine Daten."* Diese Aussage war dadurch **faktisch falsch** und stellte sowohl eine Verletzung von Art. 17 DSGVO (Recht auf Löschung) als auch eine irreführende Angabe in der eigenen Datenschutzerklärung dar (Art. 12/13).
+
+**Fix:** `medications` und `medication_intake_logs` wurden in `USER_DATA_TABLES` ergänzt ([src/app/api/account/route.ts:11-21](src/app/api/account/route.ts#L11-L21)). Die Zusage in der Datenschutzerklärung stimmt damit wieder mit dem tatsächlichen Verhalten überein.
 
 **Weitere Befunde:**
 - HTTPS wird über `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` erzwungen ([next.config.ts:25](next.config.ts#L25)). 🟢
@@ -166,11 +178,11 @@ Das widerspricht direkt der eigenen Zusage in der Datenschutzerklärung: [src/ap
 - Bereits behobene Punkte aus dem `DSGVO_AUDIT.md` (Commit `845d0cd`): granulare Korrektur/Löschung einzelner Laborwerte, Offenlegung des Gemini-USA-Transfers in der Datenschutzerklärung, PII-Warnhinweis in der Familienanamnese. Nicht erneut geprüft, da bereits dokumentiert behoben.
 - Weiterhin offen aus dem `DSGVO_AUDIT.md` (unverändert, rechtliche statt technische Frage): Familienanamnese erfasst Gesundheitsdaten von Verwandten ohne deren eigene Einwilligung/Informationsrecht (Art. 14) — siehe dort, Punkt 6.
 
-**Was noch zu tun wäre (Priorität Hoch):**
-1. `medications` und `medication_intake_logs` in `USER_DATA_TABLES` (account/route.ts) ergänzen — kleinste, wirksamste Maßnahme.
-2. Den Löschvorgang testen (z. B. Testkonto mit Medikamenten anlegen, löschen, per SQL prüfen, dass wirklich nichts übrig bleibt).
+**Was noch zu tun wäre (Priorität Niedrig, Rest-Punkte nach dem Fix):**
+1. ✅ ~~`medications` und `medication_intake_logs` in `USER_DATA_TABLES` ergänzen~~ — erledigt, Commit `d6ad460`.
+2. Den Löschvorgang end-to-end testen (Testkonto mit Medikamenten anlegen, löschen, per SQL verifizieren, dass wirklich nichts übrig bleibt) — Code-Fix ist drin, ein tatsächlicher Testlauf gegen die DB steht noch aus.
 3. Generell: einen Prozess/Test etablieren, der bei jeder neuen personenbezogenen Tabelle automatisch daran erinnert, sie in die Löschroutine aufzunehmen (z. B. ein einfacher Test, der alle Tabellen mit `user_id`-Spalte aus dem Schema gegen `USER_DATA_TABLES` abgleicht), damit dieser Fehler nicht beim nächsten Feature wieder auftritt.
-4. Den Lösch-Loop in `account/route.ts` auf Teilausfälle prüfen: Aktuell ist er nicht transaktional — schlägt Tabelle N fehl, sind Tabellen 1..N-1 bereits gelöscht, der Account bleibt aber bestehen (inkonsistenter Zwischenzustand). Niedrigere Priorität als Punkt 1, aber für eine "Recht auf Löschung"-Funktion relevant.
+4. Den Lösch-Loop in `account/route.ts` auf Teilausfälle prüfen: Aktuell ist er nicht transaktional — schlägt Tabelle N fehl, sind Tabellen 1..N-1 bereits gelöscht, der Account bleibt aber bestehen (inkonsistenter Zwischenzustand). Für eine "Recht auf Löschung"-Funktion relevant, aber kein akuter Vorfall bekannt.
 
 ---
 
@@ -206,8 +218,8 @@ Das widerspricht direkt der eigenen Zusage in der Datenschutzerklärung: [src/ap
 
 ## Priorisierte Handlungsliste
 
-1. **Hoch:** `medications`/`medication_intake_logs` in die Account-Löschroutine (`USER_DATA_TABLES`) aufnehmen und Löschvorgang end-to-end testen (Kategorie 7).
-2. **Hoch (manuell verifizieren):** Bestätigen, dass `SUPABASE_SERVICE_ROLE_KEY`/`GEMINI_API_KEY`/`VERCEL_OIDC_TOKEN` seit dem 2026-07-24-Audit rotiert wurden.
+1. ✅ **Erledigt (2026-07-25):** `medications`/`medication_intake_logs` in die Account-Löschroutine (`USER_DATA_TABLES`) aufgenommen (Commit `d6ad460`). Offen bleibt nur noch ein End-to-End-Test des Löschvorgangs gegen die echte DB (Kategorie 7).
+2. ✅ **Erledigt (2026-07-25):** `SUPABASE_SERVICE_ROLE_KEY`/`GEMINI_API_KEY`/`VERCEL_OIDC_TOKEN` laut Nutzerangabe rotiert.
 3. **Mittel:** Rate-Limiting auf `PATCH`/`DELETE`/`PUT`-Endpunkte ausweiten, insbesondere `body-checks/[id]` (Kategorie 4/5).
 4. **Mittel:** `body-checks/[id]` PATCH um Bereichs-/Größenvalidierung für `heightCm`/`weightKg`/`familyHistory` ergänzen (Kategorie 4).
 5. **Mittel:** Dependency-Lage bei `sharp`/`postcss` beobachten bzw. `overrides` und Deaktivierung der ungenutzten `/_next/image`-Route prüfen (Kategorie 6).
