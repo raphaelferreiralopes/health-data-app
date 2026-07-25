@@ -5,9 +5,9 @@ import { serverError } from '@/app/lib/apiError';
 
 // Every table that stores rows keyed by user_id -- kept as an explicit list
 // (rather than relying only on FK cascades) so this stays correct even if a
-// future table's cascade rule is misconfigured. recommended_tests also
-// cascades from body_checks via its FK, deleting it here too is redundant
-// but harmless.
+// future table's cascade rule is misconfigured. recommended_tests and
+// medication_intake_logs also cascade from body_checks/medications via their
+// FK, deleting them here too is redundant but harmless.
 const USER_DATA_TABLES = [
   'lab_results',
   'analysis_uploads',
@@ -15,6 +15,8 @@ const USER_DATA_TABLES = [
   'recommended_tests',
   'processes',
   'body_checks',
+  'medication_intake_logs',
+  'medications',
   'profiles',
 ] as const;
 
