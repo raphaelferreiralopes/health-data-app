@@ -9,9 +9,9 @@ const RATE_LIMIT_MAX_LOGS = 500;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-type LogRow = { medication_id: string };
+type LogRow = { medication_id: string; dose_index: number };
 
-/** Medication ids already checked off for a given day (?date=YYYY-MM-DD). */
+/** Checked-off (medicationId, doseIndex) pairs for a given day (?date=YYYY-MM-DD). */
 export async function GET(request: Request) {
   const supabase = getSupabaseServerClient();
   const userId = await getAuthenticatedUserId(request, supabase);
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('medication_intake_logs')
-    .select('medication_id')
+    .select('medication_id, dose_index')
     .eq('user_id', userId)
     .eq('log_date', date);
 
@@ -35,10 +35,12 @@ export async function GET(request: Request) {
     return serverError('medication-logs list failed', error);
   }
 
-  return NextResponse.json({ medicationIds: (data as LogRow[]).map((row) => row.medication_id) });
+  return NextResponse.json({
+    doses: (data as LogRow[]).map((row) => ({ medicationId: row.medication_id, doseIndex: row.dose_index })),
+  });
 }
 
-/** Checks off a medication as taken for a given day; idempotent (upsert on the medication_id+log_date unique key). */
+/** Checks off one dose of a medication for a given day; idempotent (upsert on the medication_id+log_date+dose_index unique key). */
 export async function POST(request: Request) {
   const supabase = getSupabaseServerClient();
   const userId = await getAuthenticatedUserId(request, supabase);
@@ -57,9 +59,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Zu viele Änderungen. Bitte versuche es später erneut.' }, { status: 429 });
   }
 
-  const body = (await request.json()) as { medicationId?: string; date?: string };
+  const body = (await request.json()) as { medicationId?: string; date?: string; doseIndex?: number };
   const medicationId = typeof body.medicationId === 'string' ? body.medicationId : '';
   const date = typeof body.date === 'string' ? body.date : '';
+  const doseIndex = typeof body.doseIndex === 'number' && Number.isInteger(body.doseIndex) && body.doseIndex >= 0 ? body.doseIndex : 0;
 
   if (!medicationId || !DATE_PATTERN.test(date)) {
     return NextResponse.json({ error: 'medicationId und Datum sind erforderlich' }, { status: 400 });
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from('medication_intake_logs')
-    .upsert({ user_id: userId, medication_id: medicationId, log_date: date }, { onConflict: 'medication_id,log_date' });
+    .upsert({ user_id: userId, medication_id: medicationId, log_date: date, dose_index: doseIndex }, { onConflict: 'medication_id,log_date,dose_index' });
 
   if (error) {
     return serverError('medication-logs insert failed', error);
@@ -76,7 +79,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
-/** Unchecks a medication for a given day (?medicationId=&date=YYYY-MM-DD). */
+/** Unchecks one dose of a medication for a given day (?medicationId=&date=YYYY-MM-DD&doseIndex=). */
 export async function DELETE(request: Request) {
   const supabase = getSupabaseServerClient();
   const userId = await getAuthenticatedUserId(request, supabase);
@@ -88,6 +91,8 @@ export async function DELETE(request: Request) {
   const url = new URL(request.url);
   const medicationId = url.searchParams.get('medicationId') ?? '';
   const date = url.searchParams.get('date') ?? '';
+  const doseIndexParam = url.searchParams.get('doseIndex');
+  const doseIndex = doseIndexParam !== null && /^\d+$/.test(doseIndexParam) ? Number(doseIndexParam) : 0;
 
   if (!medicationId || !DATE_PATTERN.test(date)) {
     return NextResponse.json({ error: 'medicationId und Datum sind erforderlich' }, { status: 400 });
@@ -98,7 +103,8 @@ export async function DELETE(request: Request) {
     .delete()
     .eq('user_id', userId)
     .eq('medication_id', medicationId)
-    .eq('log_date', date);
+    .eq('log_date', date)
+    .eq('dose_index', doseIndex);
 
   if (error) {
     return serverError('medication-logs delete failed', error);

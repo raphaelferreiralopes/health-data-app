@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getBrowserSupabaseClient } from '@/app/lib/supabaseBrowser';
 import {
+  MAX_TIMES_PER_DAY,
   MEDICATION_CATEGORIES,
   MEDICATION_CATEGORY_LABELS,
   MEDICATION_FREQUENCY_TYPES,
   MEDICATION_FREQUENCY_LABELS,
+  MIN_TIMES_PER_DAY,
   WEEKDAY_LABELS,
   addDaysToIso,
+  doseLabel,
   isMedicationDueOn,
   todayIso,
   type Medication,
@@ -25,6 +28,7 @@ type FormState = {
   frequencyType: MedicationFrequencyType;
   weekdays: number[];
   intervalDays: string;
+  timesPerDay: string;
   startDate: string;
   active: boolean;
 };
@@ -36,12 +40,17 @@ const EMPTY_FORM: FormState = {
   frequencyType: 'taeglich',
   weekdays: [],
   intervalDays: '2',
+  timesPerDay: '1',
   startDate: todayIso(),
   active: true,
 };
 
 // Anzeige Montag-first, Werte bleiben JS-getDay-kompatibel (0 = Sonntag).
 const WEEKDAY_DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+function doseKey(medicationId: string, doseIndex: number): string {
+  return `${medicationId}#${doseIndex}`;
+}
 
 function formToPayload(form: FormState) {
   return {
@@ -51,6 +60,7 @@ function formToPayload(form: FormState) {
     frequencyType: form.frequencyType,
     weekdays: form.weekdays,
     intervalDays: form.frequencyType === 'intervall' ? Number(form.intervalDays) || null : null,
+    timesPerDay: Number(form.timesPerDay) || 1,
     startDate: form.startDate,
     active: form.active,
   };
@@ -64,6 +74,7 @@ function medicationToForm(medication: Medication): FormState {
     frequencyType: medication.frequencyType,
     weekdays: medication.weekdays,
     intervalDays: medication.intervalDays != null ? String(medication.intervalDays) : '2',
+    timesPerDay: String(medication.timesPerDay),
     startDate: medication.startDate,
     active: medication.active,
   };
@@ -211,6 +222,22 @@ function MedicationForm({
         ) : null}
 
         <div>
+          <label className="text-sm font-medium text-ink" htmlFor="medication-times-per-day">
+            Wie oft pro Tag?
+          </label>
+          <input
+            id="medication-times-per-day"
+            type="number"
+            min={MIN_TIMES_PER_DAY}
+            max={MAX_TIMES_PER_DAY}
+            value={form.timesPerDay}
+            onChange={(event) => setForm((current) => ({ ...current, timesPerDay: event.target.value }))}
+            className="mt-1.5 w-24 rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm text-ink focus:border-brand focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-muted">z. B. 2, wenn morgens und abends je eine Einnahme ansteht.</p>
+        </div>
+
+        <div>
           <label className="text-sm font-medium text-ink" htmlFor="medication-start-date">
             Start
           </label>
@@ -259,8 +286,8 @@ export function MedicationsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayIso());
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [checkedDoses, setCheckedDoses] = useState<Set<string>>(new Set());
+  const [pendingDoseKey, setPendingDoseKey] = useState<string | null>(null);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -303,10 +330,10 @@ export function MedicationsView() {
         const response = await fetch(`/api/medication-logs?date=${selectedDate}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
-        const payload = (await response.json()) as { medicationIds?: string[] };
-        setCheckedIds(new Set(payload.medicationIds ?? []));
+        const payload = (await response.json()) as { doses?: { medicationId: string; doseIndex: number }[] };
+        setCheckedDoses(new Set((payload.doses ?? []).map((dose) => doseKey(dose.medicationId, dose.doseIndex))));
       } catch {
-        setCheckedIds(new Set());
+        setCheckedDoses(new Set());
       }
     };
     void loadLogs();
@@ -322,20 +349,28 @@ export function MedicationsView() {
     return medications.filter((medication) => medication.active && medication.frequencyType === 'nach_bedarf').sort((a, b) => a.name.localeCompare(b.name));
   }, [medications]);
 
-  const toggleChecked = async (medicationId: string) => {
+  const totalDueDoses = dueMedications.reduce((sum, medication) => sum + medication.timesPerDay, 0);
+  const checkedDueDoses = dueMedications.reduce(
+    (sum, medication) =>
+      sum + Array.from({ length: medication.timesPerDay }).filter((_, doseIndex) => checkedDoses.has(doseKey(medication.id, doseIndex))).length,
+    0,
+  );
+
+  const toggleDose = async (medicationId: string, doseIndex: number) => {
     if (!accessToken) return;
-    const isChecked = checkedIds.has(medicationId);
-    setPendingId(medicationId);
-    setCheckedIds((current) => {
+    const key = doseKey(medicationId, doseIndex);
+    const isChecked = checkedDoses.has(key);
+    setPendingDoseKey(key);
+    setCheckedDoses((current) => {
       const next = new Set(current);
-      if (isChecked) next.delete(medicationId);
-      else next.add(medicationId);
+      if (isChecked) next.delete(key);
+      else next.add(key);
       return next;
     });
 
     try {
       if (isChecked) {
-        await fetch(`/api/medication-logs?medicationId=${medicationId}&date=${selectedDate}`, {
+        await fetch(`/api/medication-logs?medicationId=${medicationId}&date=${selectedDate}&doseIndex=${doseIndex}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${accessToken}` },
         });
@@ -343,13 +378,13 @@ export function MedicationsView() {
         await fetch('/api/medication-logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify({ medicationId, date: selectedDate }),
+          body: JSON.stringify({ medicationId, date: selectedDate, doseIndex }),
         });
       }
     } catch {
       // best-effort; a failed toggle resets on next reload of that day
     } finally {
-      setPendingId(null);
+      setPendingDoseKey(null);
     }
   };
 
@@ -464,9 +499,9 @@ export function MedicationsView() {
                 →
               </button>
             </div>
-            {dueMedications.length > 0 ? (
+            {totalDueDoses > 0 ? (
               <span className="text-sm text-muted">
-                {dueMedications.filter((medication) => checkedIds.has(medication.id)).length} von {dueMedications.length} erledigt
+                {checkedDueDoses} von {totalDueDoses} erledigt
               </span>
             ) : null}
           </div>
@@ -485,9 +520,9 @@ export function MedicationsView() {
                     <ChecklistRow
                       key={medication.id}
                       medication={medication}
-                      isChecked={checkedIds.has(medication.id)}
-                      isPending={pendingId === medication.id}
-                      onToggle={() => toggleChecked(medication.id)}
+                      checkedDoses={checkedDoses}
+                      pendingDoseKey={pendingDoseKey}
+                      onToggleDose={(doseIndex) => toggleDose(medication.id, doseIndex)}
                     />
                   ))}
                 </div>
@@ -501,9 +536,9 @@ export function MedicationsView() {
                       <ChecklistRow
                         key={medication.id}
                         medication={medication}
-                        isChecked={checkedIds.has(medication.id)}
-                        isPending={pendingId === medication.id}
-                        onToggle={() => toggleChecked(medication.id)}
+                        checkedDoses={checkedDoses}
+                        pendingDoseKey={pendingDoseKey}
+                        onToggleDose={(doseIndex) => toggleDose(medication.id, doseIndex)}
                       />
                     ))}
                   </div>
@@ -560,6 +595,7 @@ export function MedicationsView() {
                           .join(', ')}`
                       : ''}
                     {medication.frequencyType === 'intervall' ? ` (${medication.intervalDays} Tage)` : ''}
+                    {medication.timesPerDay > 1 ? ` · ${medication.timesPerDay}x täglich` : ''}
                   </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-4">
@@ -581,35 +617,44 @@ export function MedicationsView() {
 
 function ChecklistRow({
   medication,
-  isChecked,
-  isPending,
-  onToggle,
+  checkedDoses,
+  pendingDoseKey,
+  onToggleDose,
 }: {
   medication: Medication;
-  isChecked: boolean;
-  isPending: boolean;
-  onToggle: () => void;
+  checkedDoses: Set<string>;
+  pendingDoseKey: string | null;
+  onToggleDose: (doseIndex: number) => void;
 }) {
+  const doseIndexes = Array.from({ length: medication.timesPerDay }, (_, index) => index);
+  const allChecked = doseIndexes.every((doseIndex) => checkedDoses.has(doseKey(medication.id, doseIndex)));
+
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={isPending}
-      className={`flex items-center gap-3.5 rounded-2xl border p-4 text-left transition disabled:opacity-70 ${
-        isChecked ? 'border-brand bg-brand-pale' : 'border-line bg-surface hover:border-brand'
-      }`}
-    >
-      <span
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-          isChecked ? 'bg-brand text-white' : 'border border-line text-muted'
-        }`}
-      >
-        {isChecked ? '✓' : ''}
-      </span>
+    <div className={`flex items-center justify-between gap-3.5 rounded-2xl border p-4 transition ${allChecked ? 'border-brand bg-brand-pale' : 'border-line bg-surface'}`}>
       <span className="flex flex-col">
-        <span className={`text-sm font-medium ${isChecked ? 'text-brand-deep' : 'text-ink'}`}>{medication.name}</span>
+        <span className={`text-sm font-medium ${allChecked ? 'text-brand-deep' : 'text-ink'}`}>{medication.name}</span>
         {medication.description ? <span className="text-xs text-muted">{medication.description}</span> : null}
       </span>
-    </button>
+      <span className="flex shrink-0 items-center gap-2">
+        {doseIndexes.map((doseIndex) => {
+          const key = doseKey(medication.id, doseIndex);
+          const isChecked = checkedDoses.has(key);
+          return (
+            <button
+              key={doseIndex}
+              type="button"
+              onClick={() => onToggleDose(doseIndex)}
+              disabled={pendingDoseKey === key}
+              title={medication.timesPerDay > 1 ? doseLabel(doseIndex) : undefined}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition disabled:opacity-70 ${
+                isChecked ? 'bg-brand text-white' : 'border border-line text-muted hover:border-brand'
+              }`}
+            >
+              {isChecked ? '✓' : medication.timesPerDay > 1 ? doseIndex + 1 : ''}
+            </button>
+          );
+        })}
+      </span>
+    </div>
   );
 }

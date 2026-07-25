@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       frequency_type: payload.frequencyType,
       weekdays: payload.weekdays,
       interval_days: payload.intervalDays,
+      times_per_day: payload.timesPerDay,
       start_date: payload.startDate,
       active: payload.active,
     })

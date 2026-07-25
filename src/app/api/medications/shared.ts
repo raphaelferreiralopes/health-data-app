@@ -1,4 +1,4 @@
-import type { Medication, MedicationCategory, MedicationFrequencyType } from '@/core/medicationSchedule';
+import { MAX_TIMES_PER_DAY, MIN_TIMES_PER_DAY, type Medication, type MedicationCategory, type MedicationFrequencyType } from '@/core/medicationSchedule';
 
 export type MedicationRow = {
   id: string;
@@ -8,6 +8,7 @@ export type MedicationRow = {
   frequency_type: MedicationFrequencyType;
   weekdays: number[];
   interval_days: number | null;
+  times_per_day: number;
   start_date: string;
   active: boolean;
   created_at: string;
@@ -23,6 +24,7 @@ export function toMedicationEntry(row: MedicationRow): Medication {
     frequencyType: row.frequency_type,
     weekdays: row.weekdays ?? [],
     intervalDays: row.interval_days,
+    timesPerDay: row.times_per_day ?? 1,
     startDate: row.start_date,
     active: row.active,
     createdAt: row.created_at,
@@ -41,6 +43,7 @@ export type MedicationPayload = {
   frequencyType: MedicationFrequencyType;
   weekdays: number[];
   intervalDays: number | null;
+  timesPerDay: number;
   startDate: string;
   active: boolean;
 };
@@ -71,5 +74,10 @@ export function parseMedicationPayload(body: Record<string, unknown>, { isMedica
 
   const active = typeof body.active === 'boolean' ? body.active : true;
 
-  return { name, description, category, frequencyType, weekdays, intervalDays, startDate, active };
+  const timesPerDay =
+    typeof body.timesPerDay === 'number' && Number.isInteger(body.timesPerDay) && body.timesPerDay >= MIN_TIMES_PER_DAY && body.timesPerDay <= MAX_TIMES_PER_DAY
+      ? body.timesPerDay
+      : 1;
+
+  return { name, description, category, frequencyType, weekdays, intervalDays, timesPerDay, startDate, active };
 }

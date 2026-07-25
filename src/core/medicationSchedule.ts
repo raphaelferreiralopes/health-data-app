@@ -41,11 +41,20 @@ export type Medication = {
   frequencyType: MedicationFrequencyType;
   weekdays: number[];
   intervalDays: number | null;
+  timesPerDay: number;
   startDate: string;
   active: boolean;
   createdAt: string;
   updatedAt: string;
 };
+
+export const MIN_TIMES_PER_DAY = 1;
+export const MAX_TIMES_PER_DAY = 6;
+
+/** Generic per-dose labels ("1. Einnahme", "2. Einnahme", ...) since there's no specific time-of-day config. */
+export function doseLabel(doseIndex: number): string {
+  return `${doseIndex + 1}. Einnahme`;
+}
 
 function daysBetween(fromIso: string, toIso: string): number {
   const from = new Date(`${fromIso}T00:00:00Z`).getTime();

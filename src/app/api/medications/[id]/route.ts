@@ -31,6 +31,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       frequency_type: payload.frequencyType,
       weekdays: payload.weekdays,
       interval_days: payload.intervalDays,
+      times_per_day: payload.timesPerDay,
       start_date: payload.startDate,
       active: payload.active,
       updated_at: new Date().toISOString(),
