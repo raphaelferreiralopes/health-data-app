@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from '@/app/lib/supabaseServer';
 import { getAuthenticatedUserId } from '@/app/lib/apiAuth';
 import { isWithinRateLimit } from '@/app/lib/rateLimit';
 import { serverError } from '@/app/lib/apiError';
+import { isValidResult, type LabResultInput } from './shared';
 
 // Generous row-count cap (rather than request-count) since a single save can
 // legitimately carry a whole PDF's worth of parameters (100+ rows).
@@ -12,30 +13,9 @@ const RATE_LIMIT_MAX_ROWS = 500;
 // check above (which only looks at rows from *before* this request).
 const MAX_RESULTS_PER_REQUEST = 1000;
 
-const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-type LabResultInput = {
-  parameterId: string;
-  valueNumeric?: number | null;
-  valueQualitative?: string | null;
-  measuredAt: string;
-};
-
 type LabResultsPayload = {
   results?: LabResultInput[];
 };
-
-function isValidResult(value: unknown): value is LabResultInput {
-  if (!value || typeof value !== 'object') return false;
-  const { parameterId, valueNumeric, valueQualitative, measuredAt } = value as Record<string, unknown>;
-
-  if (typeof parameterId !== 'string' || parameterId.length === 0) return false;
-  if (valueNumeric !== undefined && valueNumeric !== null && typeof valueNumeric !== 'number') return false;
-  if (valueQualitative !== undefined && valueQualitative !== null && typeof valueQualitative !== 'string') return false;
-  if (typeof measuredAt !== 'string' || !DATE_ONLY_RE.test(measuredAt)) return false;
-
-  return true;
-}
 
 /** Writes user-confirmed lab results, e.g. from the PDF extraction review step. */
 export async function POST(request: Request) {

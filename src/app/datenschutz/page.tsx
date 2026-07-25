@@ -57,9 +57,15 @@ export default function DatenschutzPage() {
             </li>
             <li>
               <strong className="text-ink">Google (Gemini API)</strong> -- nur wenn du aktiv &bdquo;Werte automatisch auslesen&ldquo; nutzt,
-              wird das jeweilige Dokument zur Auswertung an die Gemini-API geschickt.
+              wird das jeweilige Dokument zur Auswertung an die Gemini-API geschickt. Dabei findet eine Übertragung in die USA
+              statt (Google LLC bzw. Google Ireland Limited als Auftragsverarbeiter). Wir befinden uns in der Prüfung
+              geeigneter Garantien (z. B. Standardvertragsklauseln) für diese Übermittlung.
             </li>
           </ul>
+          <p className="mt-2 text-sm text-muted">
+            Außerdem protokollieren wir intern, wie oft du die automatische Auswertung nutzt (Zeitpunkt und Anzahl, ohne
+            Dokumenteninhalt), um ein faires Nutzungslimit für alle Beta-Tester:innen einzuhalten.
+          </p>
         </div>
 
         <div>

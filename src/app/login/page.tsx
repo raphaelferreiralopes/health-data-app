@@ -146,7 +146,9 @@ function LoginForm() {
                   <a href="/datenschutz" target="_blank" rel="noreferrer" className="font-medium text-brand hover:text-brand-deep">
                     Datenschutz- und Gesundheitshinweise
                   </a>{' '}
-                  gelesen und bin einverstanden, dass meine Gesundheitsdaten hier zu Testzwecken gespeichert werden.
+                  gelesen und bin einverstanden, dass meine Gesundheitsdaten hier zu Testzwecken gespeichert werden -- optional
+                  auch automatisiert durch einen externen KI-Dienst (Google Gemini) ausgewertet, wenn ich diese Funktion aktiv
+                  nutze.
                 </span>
               </label>
             ) : null}

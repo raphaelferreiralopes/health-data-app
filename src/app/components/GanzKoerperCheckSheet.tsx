@@ -461,6 +461,10 @@ export function GanzKoerperCheckSheet({
               </div>
             ) : (
               <div className="flex flex-col gap-3">
+                <p className="text-xs text-muted">
+                  Bitte hier keine Namen oder sonstigen identifizierenden Angaben zu Angehörigen eintragen -- Angabe von
+                  Verwandtschaftsgrad und Erkrankungsalter reicht aus.
+                </p>
                 <textarea
                   value={sectionNotes[currentStep.sectionKey] ?? ''}
                   onChange={(e) => handleSectionNoteChange(currentStep.sectionKey, e.target.value)}
