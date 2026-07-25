@@ -4,6 +4,7 @@ import { FormEvent, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LogoMark } from '@/app/components/Logo';
 import { getBrowserSupabaseClient } from '@/app/lib/supabaseBrowser';
+import { recordLoginMode } from '@/app/lib/rememberMe';
 
 function LoginForm() {
   const router = useRouter();
@@ -14,6 +15,7 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [hasConsented, setHasConsented] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,6 +52,7 @@ function LoginForm() {
         }
 
         if (data.session) {
+          recordLoginMode(rememberMe ? 'remember' : 'ephemeral');
           router.push(nextPath);
           router.refresh();
           return;
@@ -63,6 +66,7 @@ function LoginForm() {
           throw error;
         }
 
+        recordLoginMode(rememberMe ? 'remember' : 'ephemeral');
         router.push(nextPath);
         router.refresh();
         return;
@@ -152,6 +156,21 @@ function LoginForm() {
                 </span>
               </label>
             ) : null}
+
+            <div>
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 rounded border-line"
+                />
+                Angemeldet bleiben
+              </label>
+              {!rememberMe ? (
+                <p className="mt-1 text-xs text-muted">Du wirst abgemeldet, sobald du den Browser schließt und neu öffnest.</p>
+              ) : null}
+            </div>
 
             <button
               type="submit"

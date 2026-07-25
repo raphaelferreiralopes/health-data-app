@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getBrowserSupabaseClient } from '@/app/lib/supabaseBrowser';
+import { clearLoginMode, isStaleEphemeralSession, markTabAlive } from '@/app/lib/rememberMe';
 
 type AuthState = {
   email: string;
@@ -60,6 +61,19 @@ export function AuthGate() {
     client.auth.getSession().then(({ data }) => {
       const user = data.session?.user;
       if (user) {
+        // Supabase's session cookie always persists ~400 days regardless of
+        // "Angemeldet bleiben" (see rememberMe.ts), so a session marked
+        // ephemeral that survived a full browser restart is forcibly ended
+        // here instead of relying on the cookie itself to expire.
+        if (isStaleEphemeralSession()) {
+          clearLoginMode();
+          client.auth.signOut().then(() => {
+            router.push('/login');
+            router.refresh();
+          });
+          return;
+        }
+        markTabAlive();
         setSessionUser({
           id: user.id,
           email: user.email ?? '',
@@ -89,7 +103,7 @@ export function AuthGate() {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [client]);
+  }, [client, router]);
 
   const handleLogout = async () => {
     if (!client) {
@@ -97,6 +111,7 @@ export function AuthGate() {
     }
 
     setIsLoading(true);
+    clearLoginMode();
     await client.auth.signOut();
     router.push('/login');
     router.refresh();
@@ -126,6 +141,7 @@ export function AuthGate() {
         throw new Error(payload.error ?? 'Konto konnte nicht gelöscht werden.');
       }
 
+      clearLoginMode();
       await client.auth.signOut();
       router.push('/login');
       router.refresh();
