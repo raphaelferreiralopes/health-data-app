@@ -157,12 +157,16 @@ export function AuthGate() {
       setProfileDateOfBirth(profile.dateOfBirth);
     }
     setProfileError('');
+    setIsConfirmingDelete(false);
+    setDeleteError('');
     setIsEditingProfile(true);
   };
 
   const closeProfileModal = () => {
     setIsEditingProfile(false);
     setHasDismissedProfilePrompt(true);
+    setIsConfirmingDelete(false);
+    setDeleteError('');
   };
 
   const handleSaveProfile = async (event: FormEvent) => {
@@ -208,35 +212,6 @@ export function AuthGate() {
     );
   }
 
-  if (isConfirmingDelete) {
-    return (
-      <div className="flex flex-col items-end gap-2">
-        <p className="max-w-xs text-right text-xs text-muted">
-          Konto und alle Daten unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsConfirmingDelete(false)}
-            disabled={isDeleting}
-            className="rounded-full border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-card disabled:opacity-60"
-          >
-            Abbrechen
-          </button>
-          <button
-            type="button"
-            onClick={handleDeleteAccount}
-            disabled={isDeleting}
-            className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-          >
-            {isDeleting ? 'Lösche…' : 'Ja, endgültig löschen'}
-          </button>
-        </div>
-        {deleteError ? <p className="text-xs text-red-600">{deleteError}</p> : null}
-      </div>
-    );
-  }
-
   // Auto-popup right after signup/login as long as no profile exists yet --
   // dismissible ("Später"), so it isn't a hard onboarding gate, but it comes
   // back on the next login until filled in. Also reachable manually via the
@@ -245,58 +220,24 @@ export function AuthGate() {
 
   return (
     <>
-      {isConfirmingDelete ? (
-        <div className="flex flex-col items-end gap-2">
-          <p className="max-w-xs text-right text-xs text-muted">
-            Konto und alle Daten unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsConfirmingDelete(false)}
-              disabled={isDeleting}
-              className="rounded-full border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-card disabled:opacity-60"
-            >
-              Abbrechen
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteAccount}
-              disabled={isDeleting}
-              className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-            >
-              {isDeleting ? 'Lösche…' : 'Ja, endgültig löschen'}
-            </button>
-          </div>
-          {deleteError ? <p className="text-xs text-red-600">{deleteError}</p> : null}
+      <div className="flex flex-wrap items-center gap-3">
+        <div>
+          <p className="text-sm font-semibold text-ink">Hallo, {sessionUser.displayName}</p>
+          <p className="text-xs text-muted">{sessionUser.email}</p>
         </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <p className="text-sm font-semibold text-ink">Hallo, {sessionUser.displayName}</p>
-            <p className="text-xs text-muted">{sessionUser.email}</p>
-          </div>
-          {profile !== null && profile !== 'loading' ? (
-            <button type="button" onClick={openProfileEditor} className="text-sm font-medium text-muted hover:text-ink">
-              Profil bearbeiten
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-full border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-card"
-          >
-            Abmelden
+        {profile !== null && profile !== 'loading' ? (
+          <button type="button" onClick={openProfileEditor} className="text-sm font-medium text-muted hover:text-ink">
+            Profil bearbeiten
           </button>
-          <button
-            type="button"
-            onClick={() => setIsConfirmingDelete(true)}
-            className="text-sm font-medium text-muted hover:text-red-600"
-          >
-            Konto löschen
-          </button>
-        </div>
-      )}
+        ) : null}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="rounded-full border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-card"
+        >
+          Abmelden
+        </button>
+      </div>
 
       {showProfileModal ? (
         <div
@@ -362,6 +303,45 @@ export function AuthGate() {
               </button>
             </div>
             {profileError ? <p className="text-xs text-red-600">{profileError}</p> : null}
+
+            {profile !== null && profile !== 'loading' ? (
+              <div className="mt-2 border-t border-line pt-4">
+                {isConfirmingDelete ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-muted">
+                      Konto und alle Daten unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingDelete(false)}
+                        disabled={isDeleting}
+                        className="rounded-full border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-card disabled:opacity-60"
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting}
+                        className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {isDeleting ? 'Lösche…' : 'Ja, endgültig löschen'}
+                      </button>
+                    </div>
+                    {deleteError ? <p className="text-xs text-red-600">{deleteError}</p> : null}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingDelete(true)}
+                    className="text-xs font-medium text-muted hover:text-red-600"
+                  >
+                    Konto löschen
+                  </button>
+                )}
+              </div>
+            ) : null}
           </form>
         </div>
       ) : null}

@@ -143,6 +143,23 @@ export function AnalysisUploadCard() {
     }
   };
 
+  const handleDeleteEntry = async (entryId: string) => {
+    setEntries((current) => current.filter((entry) => entry.id !== entryId));
+
+    if (!accessToken) {
+      return;
+    }
+
+    try {
+      await fetch(`/api/analysis-uploads/${entryId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch {
+      // best-effort; reappears on next reload if the delete failed
+    }
+  };
+
   const handleConfirmExtraction = async (rows: ConfirmedLabResult[]) => {
     if (!accessToken) {
       throw new Error('Nicht angemeldet.');
@@ -298,16 +315,25 @@ export function AnalysisUploadCard() {
 
                 {entry.notes ? <p className="whitespace-pre-wrap text-sm text-muted">{entry.notes}</p> : null}
 
-                {entry.fileData ? (
-                  <a
-                    href={entry.fileData}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm font-medium text-brand hover:text-brand-deep"
+                <div className="mt-1 flex items-center gap-4">
+                  {entry.fileData ? (
+                    <a
+                      href={entry.fileData}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-medium text-brand hover:text-brand-deep"
+                    >
+                      {entry.fileName ?? 'PDF'} ansehen
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteEntry(entry.id)}
+                    className="text-sm font-medium text-muted hover:text-red-600"
                   >
-                    {entry.fileName ?? 'PDF öffnen'}
-                  </a>
-                ) : null}
+                    Löschen
+                  </button>
+                </div>
               </article>
             ))}
           </div>
