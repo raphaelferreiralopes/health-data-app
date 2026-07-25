@@ -25,7 +25,7 @@ function DocumentDetailSheet({ entry, onClose }: { entry: DocumentEntry; onClose
         role="dialog"
         aria-modal="true"
         aria-labelledby="document-detail-title"
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl bg-surface p-6 shadow-xl sm:rounded-2xl"
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-y-auto rounded-t-2xl bg-surface p-6 shadow-xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -42,14 +42,21 @@ function DocumentDetailSheet({ entry, onClose }: { entry: DocumentEntry; onClose
         {entry.notes ? <p className="mt-4 whitespace-pre-wrap text-sm text-ink">{entry.notes}</p> : null}
 
         {entry.fileData ? (
-          <a
-            href={entry.fileData}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-5 self-start rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-deep"
-          >
-            {entry.fileName ?? 'PDF öffnen'}
-          </a>
+          <>
+            <iframe
+              src={entry.fileData}
+              title={entry.fileName ?? 'Dokument-Vorschau'}
+              className="mt-5 h-[70vh] w-full rounded-xl border border-line"
+            />
+            <a
+              href={entry.fileData}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 self-start text-sm font-medium text-brand hover:text-brand-deep"
+            >
+              {entry.fileName ?? 'PDF'} in neuem Tab öffnen
+            </a>
+          </>
         ) : null}
       </div>
     </div>

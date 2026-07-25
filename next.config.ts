@@ -13,6 +13,10 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   `connect-src 'self' ${SUPABASE_CONNECT_SRC}`,
+  // Uploaded documents are stored as data: URLs and previewed in-app via an
+  // <iframe> (DocumentsOverview) -- default-src alone would block that.
+  "frame-src 'self' data:",
+  "object-src 'self' data:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
