@@ -218,7 +218,7 @@ export function AnalysisUploadCard() {
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 py-10 sm:px-6">
       <div>
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-brand-deep">Analyse-Ergebnisse</p>
-        <h1 className="mt-2 text-2xl font-semibold text-ink">Ergebnisse einfach sichern</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-ink">Dokumente hochladen</h1>
         <p className="mt-2 text-sm text-muted">Speichere deine Befunde manuell oder als PDF.</p>
       </div>
 
