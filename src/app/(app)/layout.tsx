@@ -1,6 +1,7 @@
 import { PrimaryNav } from "@/app/components/PrimaryNav";
 import { LogoMark } from "@/app/components/Logo";
 import { AuthGate } from "@/app/components/AuthGate";
+import { ChatBubble } from "@/app/components/ChatBubble";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,6 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           Datenschutz &amp; Hinweise
         </a>
       </footer>
+      <ChatBubble />
     </>
   );
 }
