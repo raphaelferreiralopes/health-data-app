@@ -112,7 +112,15 @@ export async function GET(request: Request) {
     const responses = await Promise.all(
       DATA_TYPES.map((dataType) => {
         const url = new URL(`${API_BASE}/users/me/dataTypes/${dataType}/dataPoints`);
-        url.searchParams.set('filter', `${dataType}.interval.start_time >= "${since}"`);
+        // "interval.start_time" is a valid filter member for steps/weight/
+        // dailyRestingHeartRate, but Google rejects it for "sleep" with
+        // INVALID_DATA_POINT_FILTER_DATA_TYPE_MEMBER -- sleep's dataPoint
+        // schema apparently doesn't expose that field for filtering. Rather
+        // than guess further at the right field name, skip filtering for
+        // sleep and rely on its tight pageSize cap (25) to bound the result.
+        if (dataType !== 'sleep') {
+          url.searchParams.set('filter', `${dataType}.interval.start_time >= "${since}"`);
+        }
         url.searchParams.set('pageSize', String(MAX_PAGE_SIZE[dataType] ?? DEFAULT_PAGE_SIZE));
         return fetch(url, { headers: authHeaders });
       }),
