@@ -207,14 +207,7 @@ export function WearablesOverview() {
           <section className="mt-6">
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Verbindungen</h2>
             <div className="mt-2 divide-y divide-line rounded-2xl border border-line bg-surface px-6">
-              <ConnectionRow
-                title="Whoop"
-                description="Schlaf, Erholung (Recovery) und Trainingsbelastung."
-                connectHref="/api/wearables/whoop/connect"
-                isLoading={isLoading}
-                isConnected={isWhoopConnected}
-                onDisconnect={() => disconnect('whoop')}
-              />
+              <ConnectionRow title="Whoop" description="Schlaf, Erholung (Recovery) und Trainingsbelastung." planned />
               <ConnectionRow
                 title="Fitbit"
                 description="Schritte, Ruhepuls, Schlaf und Gewicht (über die Google Health API)."
