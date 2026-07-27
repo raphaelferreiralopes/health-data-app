@@ -70,51 +70,60 @@ function ConnectionBanner({ status, errorCode, providerLabel }: { status: string
   );
 }
 
-function ProviderCard({
+function ConnectionRow({
   title,
   description,
   connectHref,
   isLoading,
   isConnected,
-  isExpired,
-  loadError,
+  planned,
   onDisconnect,
-  children,
 }: {
   title: string;
   description: string;
-  connectHref: string;
-  isLoading: boolean;
-  isConnected: boolean;
-  isExpired?: boolean;
-  loadError?: string;
-  onDisconnect: () => void;
-  children?: React.ReactNode;
+  connectHref?: string;
+  isLoading?: boolean;
+  isConnected?: boolean;
+  planned?: boolean;
+  onDisconnect?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-ink">{title}</h3>
-          <p className="mt-1 text-sm text-muted">{description}</p>
-        </div>
-        {isLoading ? null : isConnected ? (
-          <button type="button" onClick={onDisconnect} className="shrink-0 text-sm font-medium text-muted hover:text-red-600">
+    <div className="flex flex-wrap items-center justify-between gap-3 py-4">
+      <div>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
+        <p className="mt-0.5 text-sm text-muted">{description}</p>
+      </div>
+      {planned ? (
+        <span className="shrink-0 inline-flex items-center rounded-full bg-card px-2.5 py-1 text-xs font-medium text-muted ring-1 ring-inset ring-line">
+          Geplant
+        </span>
+      ) : isLoading ? null : isConnected ? (
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="inline-flex items-center rounded-full bg-brand-pale px-2.5 py-1 text-xs font-medium text-brand-deep">Verbunden</span>
+          <button type="button" onClick={onDisconnect} className="text-sm font-medium text-muted hover:text-red-600">
             Trennen
           </button>
-        ) : (
-          <a
-            href={connectHref}
-            className="shrink-0 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep"
-          >
-            Verbinden
-          </a>
-        )}
-      </div>
+        </div>
+      ) : (
+        <a href={connectHref} className="shrink-0 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep">
+          Verbinden
+        </a>
+      )}
+    </div>
+  );
+}
 
-      {isConnected && isExpired ? <p className="mt-4 text-sm text-red-600">Zugriff abgelaufen -- bitte erneut verbinden.</p> : null}
-      {isConnected && loadError && !isExpired ? <p className="mt-4 text-sm text-red-600">{loadError}</p> : null}
-      {isConnected && !isExpired && !loadError ? <div className="mt-4">{children}</div> : null}
+function DataSection({ title, isExpired, loadError, children }: { title: string; isExpired?: boolean; loadError?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-6">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">{title}</h3>
+      {isExpired ? (
+        <p className="mt-3 text-sm text-red-600">Zugriff abgelaufen -- bitte oben erneut verbinden.</p>
+      ) : loadError ? (
+        <p className="mt-3 text-sm text-red-600">{loadError}</p>
+      ) : (
+        <div className="mt-4">{children}</div>
+      )}
     </div>
   );
 }
@@ -173,10 +182,14 @@ export function WearablesOverview() {
     try {
       await fetch(`/api/wearables/${provider}/disconnect`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } });
     } catch {
-      // best-effort; card falls back to "not connected" once we re-fetch below
+      // best-effort; row falls back to "not connected" once we re-fetch below
     }
     await loadData(accessToken);
   };
+
+  const isWhoopConnected = Boolean(whoop?.connected);
+  const isFitbitConnected = Boolean(fitbit?.connected);
+  const hasAnyConnection = isWhoopConnected || isFitbitConnected;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
@@ -190,80 +203,95 @@ export function WearablesOverview() {
       {!isLoading && !accessToken ? (
         <p className="mt-6 text-sm text-muted">Melde dich an, um Wearables zu verbinden.</p>
       ) : (
-        <div className="mt-6 flex flex-col gap-4">
-          <ProviderCard
-            title="Whoop"
-            description="Schlaf, Erholung (Recovery) und Trainingsbelastung."
-            connectHref="/api/wearables/whoop/connect"
-            isLoading={isLoading}
-            isConnected={Boolean(whoop?.connected)}
-            isExpired={whoop?.expired}
-            loadError={whoop?.error}
-            onDisconnect={() => disconnect('whoop')}
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl bg-card p-3">
-                <p className="text-xs text-muted">Recovery</p>
-                <p className="mt-1 text-lg font-semibold text-ink">
-                  {whoop?.recovery?.scorePercent != null ? `${whoop.recovery.scorePercent}%` : '–'}
-                </p>
-                <p className="text-xs text-muted">
-                  Ruhepuls: {whoop?.recovery?.restingHeartRate ?? '–'} · {formatDateTime(whoop?.recovery?.date)}
-                </p>
-              </div>
-              <div className="rounded-xl bg-card p-3">
-                <p className="text-xs text-muted">Schlaf</p>
-                <p className="mt-1 text-lg font-semibold text-ink">
-                  {whoop?.sleep?.performancePercent != null ? `${whoop.sleep.performancePercent}%` : '–'}
-                </p>
-                <p className="text-xs text-muted">
-                  {formatDuration(whoop?.sleep?.inBedMilli)} · {formatDateTime(whoop?.sleep?.date)}
-                </p>
-              </div>
-              <div className="rounded-xl bg-card p-3">
-                <p className="text-xs text-muted">Strain</p>
-                <p className="mt-1 text-lg font-semibold text-ink">{whoop?.strain?.score != null ? whoop.strain.score.toFixed(1) : '–'}</p>
-                <p className="text-xs text-muted">
-                  Ø-Puls: {whoop?.strain?.averageHeartRate ?? '–'} · {formatDateTime(whoop?.strain?.date)}
-                </p>
-              </div>
+        <>
+          <section className="mt-6">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Verbindungen</h2>
+            <div className="mt-2 divide-y divide-line rounded-2xl border border-line bg-surface px-6">
+              <ConnectionRow
+                title="Whoop"
+                description="Schlaf, Erholung (Recovery) und Trainingsbelastung."
+                connectHref="/api/wearables/whoop/connect"
+                isLoading={isLoading}
+                isConnected={isWhoopConnected}
+                onDisconnect={() => disconnect('whoop')}
+              />
+              <ConnectionRow
+                title="Fitbit"
+                description="Schritte, Ruhepuls, Schlaf und Gewicht (über die Google Health API)."
+                connectHref="/api/wearables/fitbit/connect"
+                isLoading={isLoading}
+                isConnected={isFitbitConnected}
+                onDisconnect={() => disconnect('fitbit')}
+              />
+              <ConnectionRow title="Apple Health" description="Aktivität, Vitalwerte und Schlafdaten von iPhone und Apple Watch." planned />
             </div>
-          </ProviderCard>
+          </section>
 
-          <ProviderCard
-            title="Fitbit"
-            description="Schritte, Ruhepuls, Schlaf und Gewicht (über die Google Health API)."
-            connectHref="/api/wearables/fitbit/connect"
-            isLoading={isLoading}
-            isConnected={Boolean(fitbit?.connected)}
-            isExpired={fitbit?.expired}
-            loadError={fitbit?.error}
-            onDisconnect={() => disconnect('fitbit')}
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {Object.entries(fitbit?.metrics ?? {}).map(([type, entry]) => (
-                <div key={type} className="rounded-xl bg-card p-3">
-                  <p className="text-xs text-muted">
-                    {FITBIT_TYPE_LABELS[type] ?? type} {entry ? `(${entry.count} Datenpunkte, letzte 7 Tage)` : ''}
-                  </p>
-                  {entry ? <div className="mt-1"><RawValuePreview value={entry.latest} /></div> : <p className="mt-1 text-sm text-ink">–</p>}
-                </div>
-              ))}
-            </div>
-          </ProviderCard>
+          <section className="mt-8">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Deine Daten</h2>
 
-          <div className="rounded-2xl border border-line bg-surface p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-ink">Apple Health</h3>
-                <p className="mt-1 text-sm text-muted">Aktivität, Vitalwerte und Schlafdaten von iPhone und Apple Watch.</p>
+            {!isLoading && !hasAnyConnection ? (
+              <p className="mt-4 text-sm text-muted">Noch keine Wearables verbunden. Verbinde eins oben, um hier Daten zu sehen.</p>
+            ) : (
+              <div className="mt-2 flex flex-col gap-4">
+                {isWhoopConnected ? (
+                  <DataSection title="Whoop" isExpired={whoop?.expired} loadError={whoop?.error}>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl bg-card p-3">
+                        <p className="text-xs text-muted">Recovery</p>
+                        <p className="mt-1 text-lg font-semibold text-ink">
+                          {whoop?.recovery?.scorePercent != null ? `${whoop.recovery.scorePercent}%` : '–'}
+                        </p>
+                        <p className="text-xs text-muted">
+                          Ruhepuls: {whoop?.recovery?.restingHeartRate ?? '–'} · {formatDateTime(whoop?.recovery?.date)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-card p-3">
+                        <p className="text-xs text-muted">Schlaf</p>
+                        <p className="mt-1 text-lg font-semibold text-ink">
+                          {whoop?.sleep?.performancePercent != null ? `${whoop.sleep.performancePercent}%` : '–'}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {formatDuration(whoop?.sleep?.inBedMilli)} · {formatDateTime(whoop?.sleep?.date)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-card p-3">
+                        <p className="text-xs text-muted">Strain</p>
+                        <p className="mt-1 text-lg font-semibold text-ink">
+                          {whoop?.strain?.score != null ? whoop.strain.score.toFixed(1) : '–'}
+                        </p>
+                        <p className="text-xs text-muted">
+                          Ø-Puls: {whoop?.strain?.averageHeartRate ?? '–'} · {formatDateTime(whoop?.strain?.date)}
+                        </p>
+                      </div>
+                    </div>
+                  </DataSection>
+                ) : null}
+
+                {isFitbitConnected ? (
+                  <DataSection title="Fitbit" isExpired={fitbit?.expired} loadError={fitbit?.error}>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {Object.entries(fitbit?.metrics ?? {}).map(([type, entry]) => (
+                        <div key={type} className="rounded-xl bg-card p-3">
+                          <p className="text-xs text-muted">
+                            {FITBIT_TYPE_LABELS[type] ?? type} {entry ? `(${entry.count} Datenpunkte, letzte 7 Tage)` : ''}
+                          </p>
+                          {entry ? (
+                            <div className="mt-1">
+                              <RawValuePreview value={entry.latest} />
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-sm text-ink">–</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </DataSection>
+                ) : null}
               </div>
-              <span className="inline-flex shrink-0 items-center rounded-full bg-card px-2.5 py-1 text-xs font-medium text-muted ring-1 ring-inset ring-line">
-                Geplant
-              </span>
-            </div>
-          </div>
-        </div>
+            )}
+          </section>
+        </>
       )}
     </main>
   );
