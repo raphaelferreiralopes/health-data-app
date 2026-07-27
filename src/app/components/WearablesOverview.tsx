@@ -105,6 +105,111 @@ function KeyValueTree({ value, depth = 0 }: { value: unknown; depth?: number }) 
   );
 }
 
+const SLEEP_STAGE_ORDER = ['AWAKE', 'LIGHT', 'REM', 'DEEP'] as const;
+type SleepStageType = (typeof SLEEP_STAGE_ORDER)[number];
+const SLEEP_STAGE_SET = new Set<string>(SLEEP_STAGE_ORDER);
+// Ordinal depth ramp in the app's brand hue -- light -> dark reads as
+// "less restful -> more restful", matching how Apple Health/Oura/Whoop
+// conventionally shade sleep stages. Wach sits outside the ramp (neutral
+// gray, not a depth level). brand-pale (#e8f1fc) was tried for "Leicht"
+// first but measured 1.05:1 against the card surface -- functionally
+// invisible; #6ba9ea is a computed mid-step of the same blue hue that
+// clears 2:1 and keeps the ramp monotone (validated with the dataviz
+// skill's palette validator, --ordinal mode).
+const SLEEP_STAGE_LABELS: Record<SleepStageType, string> = { AWAKE: 'Wach', LIGHT: 'Leicht', REM: 'REM', DEEP: 'Tief' };
+const SLEEP_STAGE_BAR_CLASS: Record<SleepStageType, string> = { AWAKE: 'bg-line', LIGHT: 'bg-[#6ba9ea]', REM: 'bg-brand', DEEP: 'bg-brand-deep' };
+
+type SleepStageSummary = { type: SleepStageType; durationMs: number };
+type SleepSummary = { asleepMs: number; startIso: string | null; endIso: string | null; stages: SleepStageSummary[] };
+
+function readInterval(value: Record<string, unknown>): { start: unknown; end: unknown } {
+  const nested = value.interval && typeof value.interval === 'object' ? (value.interval as Record<string, unknown>) : value;
+  return { start: nested.startTime, end: nested.endTime };
+}
+
+/** Parses a Google Health "sleep" dataPoint into stage totals for SleepStagesCard; returns null if the shape doesn't match (falls back to the generic tree). */
+function parseSleepSummary(latest: unknown): SleepSummary | null {
+  if (!latest || typeof latest !== 'object') return null;
+  const obj = latest as Record<string, unknown>;
+
+  const { start: topStart, end: topEnd } = readInterval(obj);
+  const startIso = typeof topStart === 'string' ? topStart : null;
+  const endIso = typeof topEnd === 'string' ? topEnd : null;
+
+  const stagesRaw = Array.isArray(obj.stages) ? obj.stages : [];
+  const durationByType = new Map<SleepStageType, number>();
+
+  for (const raw of stagesRaw) {
+    if (!raw || typeof raw !== 'object') continue;
+    const stageObj = raw as Record<string, unknown>;
+    const type = typeof stageObj.type === 'string' ? stageObj.type.toUpperCase() : null;
+    if (!type || !SLEEP_STAGE_SET.has(type)) continue;
+
+    const { start, end } = readInterval(stageObj);
+    if (typeof start !== 'string' || typeof end !== 'string') continue;
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) continue;
+
+    const key = type as SleepStageType;
+    durationByType.set(key, (durationByType.get(key) ?? 0) + (endMs - startMs));
+  }
+
+  if (durationByType.size === 0) return null;
+
+  const stages = SLEEP_STAGE_ORDER.filter((type) => durationByType.has(type)).map((type) => ({
+    type,
+    durationMs: durationByType.get(type) as number,
+  }));
+  const asleepMs = stages.filter((s) => s.type !== 'AWAKE').reduce((sum, s) => sum + s.durationMs, 0);
+
+  return { asleepMs, startIso, endIso, stages };
+}
+
+/** Stacked composition bar of sleep stages -- see fitbit/data/route.ts for the raw shape and dataviz skill for the mark spec (2px surface gaps, ordinal ramp, legend + direct labels). */
+function SleepStagesCard({ latest }: { latest: unknown }) {
+  const summary = parseSleepSummary(latest);
+  if (!summary) {
+    return <KeyValueTree value={latest} />;
+  }
+
+  const totalStageMs = summary.stages.reduce((sum, s) => sum + s.durationMs, 0);
+  const endLabel =
+    summary.endIso && summary.startIso && new Date(summary.startIso).toDateString() === new Date(summary.endIso).toDateString()
+      ? new Date(summary.endIso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+      : formatDateTime(summary.endIso);
+
+  return (
+    <div>
+      <p className="text-2xl font-semibold text-ink">{formatDuration(summary.asleepMs)}</p>
+      <p className="text-xs text-muted">
+        geschlafen · {formatDateTime(summary.startIso)} – {endLabel}
+      </p>
+
+      <div className="mt-3 flex h-5 w-full gap-0.5 overflow-hidden rounded-full bg-card">
+        {summary.stages.map((stage) => (
+          <div
+            key={stage.type}
+            className={SLEEP_STAGE_BAR_CLASS[stage.type]}
+            style={{ width: `${(stage.durationMs / totalStageMs) * 100}%` }}
+            title={`${SLEEP_STAGE_LABELS[stage.type]}: ${formatDuration(stage.durationMs)}`}
+          />
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+        {summary.stages.map((stage) => (
+          <div key={stage.type} className="flex items-center gap-1.5 text-xs">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${SLEEP_STAGE_BAR_CLASS[stage.type]}`} />
+            <span className="text-muted">{SLEEP_STAGE_LABELS[stage.type]}</span>
+            <span className="font-medium text-ink">{formatDuration(stage.durationMs)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MetricTile({ label, sublabel, children }: { label: string; sublabel?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl bg-card p-3">
@@ -323,7 +428,23 @@ export function WearablesOverview() {
                           <p className="text-xs text-muted">{formatDuration(whoop?.sleep?.inBedMilli)} im Bett</p>
                         </MetricTile>
                       ) : null}
-                      {isFitbitConnected ? <FitbitMetricTile label="Fitbit" entry={fitbit?.metrics?.sleep ?? null} /> : null}
+                      {isFitbitConnected ? (
+                        (() => {
+                          const entry = fitbit?.metrics?.sleep ?? null;
+                          if (entry && 'error' in entry) {
+                            return (
+                              <MetricTile label="Fitbit">
+                                <span className="text-sm text-red-600">{entry.error}</span>
+                              </MetricTile>
+                            );
+                          }
+                          return (
+                            <MetricTile label="Fitbit" sublabel={entry ? `${entry.count} Datenpunkte, letzte 7 Tage` : undefined}>
+                              {entry ? <SleepStagesCard latest={entry.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
+                            </MetricTile>
+                          );
+                        })()
+                      ) : null}
                     </div>
                   ) : null}
 
