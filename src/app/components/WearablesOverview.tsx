@@ -186,7 +186,7 @@ function SleepStagesCard({ latest }: { latest: unknown }) {
         geschlafen · {formatDateTime(summary.startIso)} – {endLabel}
       </p>
 
-      <div className="mt-3 flex h-5 w-full gap-0.5 overflow-hidden rounded-full bg-card">
+      <div className="mt-3 flex h-5 w-full gap-0.5 overflow-hidden rounded-full bg-line/40">
         {summary.stages.map((stage) => (
           <div
             key={stage.type}
@@ -210,32 +210,38 @@ function SleepStagesCard({ latest }: { latest: unknown }) {
   );
 }
 
-function MetricTile({ label, sublabel, children }: { label: string; sublabel?: string; children: React.ReactNode }) {
+/** A labeled slice of data within the flowing "Deine Daten" list -- no box, no fill; separation comes from the list's divide-y, not from nested containers. */
+function MetricRow({ label, sublabel, children }: { label: string; sublabel?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl bg-card p-3">
-      <p className="text-xs text-muted">
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted">
         {label}
         {sublabel ? ` · ${sublabel}` : ''}
       </p>
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-2">{children}</div>
     </div>
   );
 }
 
 /** Renders a Fitbit metric entry, distinguishing a real API error from a genuinely empty result. */
-function FitbitMetricTile({ label, entry }: { label: string; entry: FitbitMetricEntry }) {
+function FitbitMetricRow({ label, entry }: { label: string; entry: FitbitMetricEntry }) {
   if (entry && 'error' in entry) {
     return (
-      <MetricTile label={label}>
+      <MetricRow label={label}>
         <span className="text-sm text-red-600">{entry.error}</span>
-      </MetricTile>
+      </MetricRow>
     );
   }
   return (
-    <MetricTile label={label} sublabel={entry ? `${entry.count} Datenpunkte, letzte 7 Tage` : undefined}>
+    <MetricRow label={label} sublabel={entry ? `${entry.count} Datenpunkte, letzte 7 Tage` : undefined}>
       {entry ? <KeyValueTree value={entry.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
-    </MetricTile>
+    </MetricRow>
   );
+}
+
+/** Vertical list of MetricRows separated by hairlines instead of a grid of boxed cards. */
+function MetricList({ children }: { children: React.ReactNode }) {
+  return <div className="divide-y divide-line [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">{children}</div>;
 }
 
 function ConnectionBanner({ status, errorCode, providerLabel }: { status: string | null; errorCode: string | null; providerLabel: string }) {
@@ -417,74 +423,70 @@ export function WearablesOverview() {
                   </p>
                 ) : null}
 
-                <div className="mt-4">
+                <div className="mt-5">
                   {dataTab === 'schlaf' ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <MetricList>
                       {isWhoopConnected ? (
-                        <MetricTile label="Whoop" sublabel={formatDateTime(whoop?.sleep?.date)}>
+                        <MetricRow label="Whoop" sublabel={formatDateTime(whoop?.sleep?.date)}>
                           <p className="text-lg font-semibold text-ink">
                             {whoop?.sleep?.performancePercent != null ? `${whoop.sleep.performancePercent}%` : '–'}
                           </p>
                           <p className="text-xs text-muted">{formatDuration(whoop?.sleep?.inBedMilli)} im Bett</p>
-                        </MetricTile>
+                        </MetricRow>
                       ) : null}
                       {isFitbitConnected ? (
                         (() => {
                           const entry = fitbit?.metrics?.sleep ?? null;
                           if (entry && 'error' in entry) {
                             return (
-                              <MetricTile label="Fitbit">
+                              <MetricRow label="Fitbit">
                                 <span className="text-sm text-red-600">{entry.error}</span>
-                              </MetricTile>
+                              </MetricRow>
                             );
                           }
                           return (
-                            <MetricTile label="Fitbit" sublabel={entry ? `${entry.count} Datenpunkte, letzte 7 Tage` : undefined}>
+                            <MetricRow label="Fitbit" sublabel={entry ? `${entry.count} Datenpunkte, letzte 7 Tage` : undefined}>
                               {entry ? <SleepStagesCard latest={entry.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
-                            </MetricTile>
+                            </MetricRow>
                           );
                         })()
                       ) : null}
-                    </div>
+                    </MetricList>
                   ) : null}
 
                   {dataTab === 'vitalwerte' ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <MetricList>
                       {isWhoopConnected ? (
-                        <>
-                          <MetricTile label="Whoop Recovery" sublabel={formatDateTime(whoop?.recovery?.date)}>
-                            <p className="text-lg font-semibold text-ink">
-                              {whoop?.recovery?.scorePercent != null ? `${whoop.recovery.scorePercent}%` : '–'}
-                            </p>
-                            <p className="text-xs text-muted">Ruhepuls: {whoop?.recovery?.restingHeartRate ?? '–'}</p>
-                          </MetricTile>
-                          <MetricTile label="Whoop Body">
-                            <p className="text-sm text-ink">
-                              {whoop?.bodyMeasurement?.weightKilogram != null ? `${whoop.bodyMeasurement.weightKilogram} kg` : '–'}
-                            </p>
-                            <p className="text-xs text-muted">Max-Puls: {whoop?.bodyMeasurement?.maxHeartRate ?? '–'}</p>
-                          </MetricTile>
-                        </>
+                        <MetricRow label="Whoop Recovery" sublabel={formatDateTime(whoop?.recovery?.date)}>
+                          <p className="text-lg font-semibold text-ink">
+                            {whoop?.recovery?.scorePercent != null ? `${whoop.recovery.scorePercent}%` : '–'}
+                          </p>
+                          <p className="text-xs text-muted">Ruhepuls: {whoop?.recovery?.restingHeartRate ?? '–'}</p>
+                        </MetricRow>
                       ) : null}
-                      {isFitbitConnected ? (
-                        <>
-                          <FitbitMetricTile label="Fitbit Ruhepuls" entry={fitbit?.metrics?.dailyRestingHeartRate ?? null} />
-                          <FitbitMetricTile label="Fitbit Gewicht" entry={fitbit?.metrics?.weight ?? null} />
-                        </>
+                      {isWhoopConnected ? (
+                        <MetricRow label="Whoop Body">
+                          <p className="text-sm text-ink">
+                            {whoop?.bodyMeasurement?.weightKilogram != null ? `${whoop.bodyMeasurement.weightKilogram} kg` : '–'}
+                          </p>
+                          <p className="text-xs text-muted">Max-Puls: {whoop?.bodyMeasurement?.maxHeartRate ?? '–'}</p>
+                        </MetricRow>
                       ) : null}
-                    </div>
+                      {isFitbitConnected ? <FitbitMetricRow label="Fitbit Ruhepuls" entry={fitbit?.metrics?.dailyRestingHeartRate ?? null} /> : null}
+                      {isFitbitConnected ? <FitbitMetricRow label="Fitbit Gewicht" entry={fitbit?.metrics?.weight ?? null} /> : null}
+                    </MetricList>
                   ) : null}
 
                   {dataTab === 'aktivitaet' ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <MetricList>
                       {isWhoopConnected ? (
-                        <MetricTile label="Whoop Strain" sublabel={formatDateTime(whoop?.strain?.date)}>
+                        <MetricRow label="Whoop Strain" sublabel={formatDateTime(whoop?.strain?.date)}>
                           <p className="text-lg font-semibold text-ink">{whoop?.strain?.score != null ? whoop.strain.score.toFixed(1) : '–'}</p>
                           <p className="text-xs text-muted">Ø-Puls: {whoop?.strain?.averageHeartRate ?? '–'}</p>
-                        </MetricTile>
+                        </MetricRow>
                       ) : null}
-                      {isFitbitConnected ? <FitbitMetricTile label="Fitbit Schritte" entry={fitbit?.metrics?.steps ?? null} /> : null}
-                    </div>
+                      {isFitbitConnected ? <FitbitMetricRow label="Fitbit Schritte" entry={fitbit?.metrics?.steps ?? null} /> : null}
+                    </MetricList>
                   ) : null}
                 </div>
               </div>
