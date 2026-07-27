@@ -17,6 +17,24 @@ const LOOKBACK_DAYS = 7;
 // what broke "sleep" here.
 const MAX_PAGE_SIZE: Partial<Record<(typeof DATA_TYPES)[number], number>> = { sleep: 25 };
 const DEFAULT_PAGE_SIZE = 100;
+// Which time-range filter field a data type's dataPoint schema actually
+// exposes -- confirmed empirically per type via INVALID_DATA_POINT_FILTER_*
+// errors, not from a single documented rule:
+//  - "interval" (interval.start_time): duration-based types (steps: a count
+//    accumulated over a time window).
+//  - "sample_time" (sample_time.physical_time): point-in-time measurements
+//    (weight: you step on a scale once, there's no "start/end").
+//  - "none": sleep rejected interval.start_time outright for reasons still
+//    unclear; dailyRestingHeartRate additionally errored on the data type
+//    id itself ("Invalid data type ID referenced in the parent data type
+//    collection"), which filtering can't fix -- may need a different type id
+//    or the dailyRollUp endpoint instead of dataPoints.list. Left
+//    unfiltered for now rather than guessing further.
+const FILTER_FIELD: Partial<Record<(typeof DATA_TYPES)[number], 'interval' | 'sample_time' | 'none'>> = {
+  sleep: 'none',
+  dailyRestingHeartRate: 'none',
+  weight: 'sample_time',
+};
 
 type ConnectionRow = {
   access_token: string;
@@ -112,14 +130,11 @@ export async function GET(request: Request) {
     const responses = await Promise.all(
       DATA_TYPES.map((dataType) => {
         const url = new URL(`${API_BASE}/users/me/dataTypes/${dataType}/dataPoints`);
-        // "interval.start_time" is a valid filter member for steps/weight/
-        // dailyRestingHeartRate, but Google rejects it for "sleep" with
-        // INVALID_DATA_POINT_FILTER_DATA_TYPE_MEMBER -- sleep's dataPoint
-        // schema apparently doesn't expose that field for filtering. Rather
-        // than guess further at the right field name, skip filtering for
-        // sleep and rely on its tight pageSize cap (25) to bound the result.
-        if (dataType !== 'sleep') {
+        const filterField = FILTER_FIELD[dataType] ?? 'interval';
+        if (filterField === 'interval') {
           url.searchParams.set('filter', `${dataType}.interval.start_time >= "${since}"`);
+        } else if (filterField === 'sample_time') {
+          url.searchParams.set('filter', `${dataType}.sample_time.physical_time >= "${since}"`);
         }
         url.searchParams.set('pageSize', String(MAX_PAGE_SIZE[dataType] ?? DEFAULT_PAGE_SIZE));
         return fetch(url, { headers: authHeaders });
