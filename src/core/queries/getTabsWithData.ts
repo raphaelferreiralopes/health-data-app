@@ -1,44 +1,36 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Tab } from '../types';
 
+type EmbeddedRow = {
+  lab_parameters: {
+    lab_subcategories: {
+      lab_categories: {
+        tab: Tab;
+      } | null;
+    } | null;
+  } | null;
+};
+
 /**
  * Returns the tabs for which the user has at least one recorded lab result.
- * Mirrors the filtering in getTabOverview but stops at existence instead of
- * building the full category/subcategory/parameter tree.
+ * Walks the FK chain lab_results -> lab_parameters -> lab_subcategories ->
+ * lab_categories via a single embedded PostgREST query instead of four
+ * sequential round-trips (one per step, each waiting on the previous one's
+ * ids) -- the previous version was the main cause of Diagnostik feeling slow
+ * to open.
  */
 export async function getTabsWithData(supabase: SupabaseClient, userId: string): Promise<Tab[]> {
-  const { data: resultRows, error: resultError } = await supabase
+  const { data, error } = await supabase
     .from('lab_results')
-    .select('parameter_id')
+    .select('lab_parameters(lab_subcategories(lab_categories(tab)))')
     .eq('user_id', userId);
-  if (resultError) throw resultError;
+  if (error) throw error;
 
-  const parameterIds = [...new Set((resultRows ?? []).map((r) => r.parameter_id))];
-  if (parameterIds.length === 0) return [];
+  const tabs = new Set<Tab>();
+  for (const row of (data ?? []) as unknown as EmbeddedRow[]) {
+    const tab = row.lab_parameters?.lab_subcategories?.lab_categories?.tab;
+    if (tab) tabs.add(tab);
+  }
 
-  const { data: parameterRows, error: parameterError } = await supabase
-    .from('lab_parameters')
-    .select('subcategory_id')
-    .in('id', parameterIds);
-  if (parameterError) throw parameterError;
-
-  const subcategoryIds = [...new Set((parameterRows ?? []).map((p) => p.subcategory_id))];
-  if (subcategoryIds.length === 0) return [];
-
-  const { data: subcategoryRows, error: subcategoryError } = await supabase
-    .from('lab_subcategories')
-    .select('category_id')
-    .in('id', subcategoryIds);
-  if (subcategoryError) throw subcategoryError;
-
-  const categoryIds = [...new Set((subcategoryRows ?? []).map((s) => s.category_id))];
-  if (categoryIds.length === 0) return [];
-
-  const { data: categoryRows, error: categoryError } = await supabase
-    .from('lab_categories')
-    .select('tab')
-    .in('id', categoryIds);
-  if (categoryError) throw categoryError;
-
-  return [...new Set((categoryRows ?? []).map((c) => c.tab as Tab))];
+  return [...tabs];
 }

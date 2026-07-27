@@ -1,5 +1,5 @@
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
+import { headers } from 'next/headers';
+import { USER_EMAIL_HEADER, USER_ID_HEADER } from '@/app/lib/authHeaders';
 
 export type ServerSessionUser = {
   id: string;
@@ -8,39 +8,27 @@ export type ServerSessionUser = {
 };
 
 /**
- * Reads the signed-in user from the session cookie for use in Server
- * Components. Uses the anon key (not the service-role client from
- * supabaseServer.ts) since this only needs to verify who's asking, not
- * bypass RLS. Cookies can't be written during Server Component rendering
- * (see proxy.ts, which refreshes the session cookie on every request), so
- * setAll is a no-op here.
+ * Reads the signed-in user for use in Server Components. proxy.ts already
+ * verified the session with Supabase (a real network round-trip to the auth
+ * server) and forwards the result via request headers -- reading those here
+ * instead of calling supabase.auth.getUser() again avoids repeating that
+ * round-trip on every layout/page in the request tree. Only id/email are
+ * carried over the header, so displayName falls back to the email's local
+ * part rather than the user's custom full_name (unused by today's callers;
+ * see AuthGate.tsx for the client-side version that has the full profile).
  */
 export async function getServerSessionUser(): Promise<ServerSessionUser | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const headerList = await headers();
+  const id = headerList.get(USER_ID_HEADER);
+  const email = headerList.get(USER_EMAIL_HEADER) ?? '';
 
-  if (!url || !anonKey) {
+  if (!id) {
     return null;
   }
 
-  const cookieStore = await cookies();
-
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: () => {},
-    },
-  });
-
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    return null;
-  }
-
-  const user = data.user;
   return {
-    id: user.id,
-    email: user.email ?? '',
-    displayName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Nutzer',
+    id,
+    email,
+    displayName: email.split('@')[0] || 'Nutzer',
   };
 }
