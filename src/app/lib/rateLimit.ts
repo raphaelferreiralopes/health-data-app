@@ -10,7 +10,7 @@ type RateLimitOptions = {
 /**
  * Counts the caller's own rows created in the last `windowMs` and reports
  * whether they're still under `limit`. Same pattern as the existing
- * pdf_extractions daily cap in analysis-uploads/extract/route.ts, generalized
+ * pdf_extractions-style daily caps used by the Gemini upload routes, generalized
  * for reuse. Fails open on DB errors -- an unrelated infra hiccup shouldn't
  * block writes.
  */
