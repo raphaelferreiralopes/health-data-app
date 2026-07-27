@@ -21,6 +21,14 @@ type FitbitData = {
   metrics?: Record<string, { count: number; latest: unknown } | null>;
 };
 
+type DataTab = 'schlaf' | 'vitalwerte' | 'aktivitaet';
+
+const DATA_TABS: { key: DataTab; label: string }[] = [
+  { key: 'schlaf', label: 'Schlaf' },
+  { key: 'vitalwerte', label: 'Vitalwerte' },
+  { key: 'aktivitaet', label: 'Aktivität' },
+];
+
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '–';
   return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -43,6 +51,21 @@ function formatPrimitive(value: unknown): string {
   return String(value);
 }
 
+/** "startTime"/"endTime" ISO pairs (Google Health's "interval" objects) collapse to one readable line instead of expanding into a deep date/time breakdown. */
+function formatIntervalValue(value: Record<string, unknown>): string | null {
+  const start = value.startTime;
+  const end = value.endTime;
+  if (typeof start !== 'string' || typeof end !== 'string') return null;
+
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+
+  const sameDay = startDate.toDateString() === endDate.toDateString();
+  const endLabel = sameDay ? endDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : formatDateTime(end);
+  return `${formatDateTime(start)} – ${endLabel}`;
+}
+
 /**
  * Recursively renders an unknown-shaped API object as an indented
  * key/value tree instead of a raw JSON dump -- see fitbit/data/route.ts for
@@ -54,6 +77,11 @@ function KeyValueTree({ value, depth = 0 }: { value: unknown; depth?: number }) 
   }
   if (typeof value !== 'object') {
     return <span className="text-sm text-ink">{formatPrimitive(value)}</span>;
+  }
+
+  const interval = !Array.isArray(value) ? formatIntervalValue(value as Record<string, unknown>) : null;
+  if (interval) {
+    return <span className="text-sm text-ink">{interval}</span>;
   }
 
   const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v] as const) : Object.entries(value as Record<string, unknown>);
@@ -72,6 +100,18 @@ function KeyValueTree({ value, depth = 0 }: { value: unknown; depth?: number }) 
         </div>
       ))}
     </dl>
+  );
+}
+
+function MetricTile({ label, sublabel, children }: { label: string; sublabel?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl bg-card p-3">
+      <p className="text-xs text-muted">
+        {label}
+        {sublabel ? ` · ${sublabel}` : ''}
+      </p>
+      <div className="mt-1.5">{children}</div>
+    </div>
   );
 }
 
@@ -130,21 +170,6 @@ function ConnectionRow({
   );
 }
 
-function DataSection({ title, isExpired, loadError, children }: { title: string; isExpired?: boolean; loadError?: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-6">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">{title}</h3>
-      {isExpired ? (
-        <p className="mt-3 text-sm text-red-600">Zugriff abgelaufen -- bitte oben erneut verbinden.</p>
-      ) : loadError ? (
-        <p className="mt-3 text-sm text-red-600">{loadError}</p>
-      ) : (
-        <div className="mt-4">{children}</div>
-      )}
-    </div>
-  );
-}
-
 export function WearablesOverview() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -153,6 +178,7 @@ export function WearablesOverview() {
   const [whoop, setWhoop] = useState<WhoopData | null>(null);
   const [fitbit, setFitbit] = useState<FitbitData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataTab, setDataTab] = useState<DataTab>('schlaf');
 
   const whoopStatus = searchParams.get('whoop');
   const whoopErrorCode = searchParams.get('whoop_error');
@@ -207,6 +233,7 @@ export function WearablesOverview() {
   const isWhoopConnected = Boolean(whoop?.connected);
   const isFitbitConnected = Boolean(fitbit?.connected);
   const hasAnyConnection = isWhoopConnected || isFitbitConnected;
+  const hasLoadIssue = (isWhoopConnected && (whoop?.expired || whoop?.error)) || (isFitbitConnected && (fitbit?.expired || fitbit?.error));
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
@@ -243,88 +270,103 @@ export function WearablesOverview() {
             {!isLoading && !hasAnyConnection ? (
               <p className="mt-4 text-sm text-muted">Noch keine Wearables verbunden. Verbinde eins oben, um hier Daten zu sehen.</p>
             ) : (
-              <div className="mt-2 flex flex-col gap-4">
-                {isWhoopConnected ? (
-                  <DataSection title="Whoop" isExpired={whoop?.expired} loadError={whoop?.error}>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div className="rounded-xl bg-card p-3">
-                        <p className="text-xs text-muted">Recovery</p>
-                        <p className="mt-1 text-lg font-semibold text-ink">
-                          {whoop?.recovery?.scorePercent != null ? `${whoop.recovery.scorePercent}%` : '–'}
-                        </p>
-                        <p className="text-xs text-muted">
-                          Ruhepuls: {whoop?.recovery?.restingHeartRate ?? '–'} · {formatDateTime(whoop?.recovery?.date)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-card p-3">
-                        <p className="text-xs text-muted">Schlaf</p>
-                        <p className="mt-1 text-lg font-semibold text-ink">
-                          {whoop?.sleep?.performancePercent != null ? `${whoop.sleep.performancePercent}%` : '–'}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {formatDuration(whoop?.sleep?.inBedMilli)} · {formatDateTime(whoop?.sleep?.date)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-card p-3">
-                        <p className="text-xs text-muted">Strain</p>
-                        <p className="mt-1 text-lg font-semibold text-ink">
-                          {whoop?.strain?.score != null ? whoop.strain.score.toFixed(1) : '–'}
-                        </p>
-                        <p className="text-xs text-muted">
-                          Ø-Puls: {whoop?.strain?.averageHeartRate ?? '–'} · {formatDateTime(whoop?.strain?.date)}
-                        </p>
-                      </div>
-                    </div>
-                  </DataSection>
+              <div className="mt-2 rounded-2xl border border-line bg-surface p-6">
+                <div className="inline-flex rounded-lg bg-card p-1" role="tablist" aria-label="Datenkategorie">
+                  {DATA_TABS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={dataTab === tab.key}
+                      onClick={() => setDataTab(tab.key)}
+                      className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                        dataTab === tab.key ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {hasLoadIssue ? (
+                  <p className="mt-4 text-sm text-red-600">
+                    {whoop?.expired || fitbit?.expired ? 'Zugriff für eine Verbindung abgelaufen -- bitte oben erneut verbinden.' : whoop?.error ?? fitbit?.error}
+                  </p>
                 ) : null}
 
-                {isFitbitConnected ? (
-                  <DataSection title="Fitbit" isExpired={fitbit?.expired} loadError={fitbit?.error}>
-                    <div className="flex flex-col gap-5">
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted">
-                          Schlaf {fitbit?.metrics?.sleep ? `· ${fitbit.metrics.sleep.count} Datenpunkte, letzte 7 Tage` : ''}
-                        </p>
-                        <div className="mt-2 rounded-xl bg-card p-3">
-                          {fitbit?.metrics?.sleep ? <KeyValueTree value={fitbit.metrics.sleep.latest} /> : <span className="text-sm text-muted">–</span>}
-                        </div>
-                      </div>
+                <div className="mt-4">
+                  {dataTab === 'schlaf' ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {isWhoopConnected ? (
+                        <MetricTile label="Whoop" sublabel={formatDateTime(whoop?.sleep?.date)}>
+                          <p className="text-lg font-semibold text-ink">
+                            {whoop?.sleep?.performancePercent != null ? `${whoop.sleep.performancePercent}%` : '–'}
+                          </p>
+                          <p className="text-xs text-muted">{formatDuration(whoop?.sleep?.inBedMilli)} im Bett</p>
+                        </MetricTile>
+                      ) : null}
+                      {isFitbitConnected ? (
+                        <MetricTile label="Fitbit" sublabel={fitbit?.metrics?.sleep ? `${fitbit.metrics.sleep.count} Datenpunkte, letzte 7 Tage` : undefined}>
+                          {fitbit?.metrics?.sleep ? <KeyValueTree value={fitbit.metrics.sleep.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
+                        </MetricTile>
+                      ) : null}
+                    </div>
+                  ) : null}
 
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted">Vitalwerte</p>
-                        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="rounded-xl bg-card p-3">
-                            <p className="text-xs text-muted">
-                              Ruhepuls {fitbit?.metrics?.dailyRestingHeartRate ? `· ${fitbit.metrics.dailyRestingHeartRate.count} Datenpunkte` : ''}
+                  {dataTab === 'vitalwerte' ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {isWhoopConnected ? (
+                        <>
+                          <MetricTile label="Whoop Recovery" sublabel={formatDateTime(whoop?.recovery?.date)}>
+                            <p className="text-lg font-semibold text-ink">
+                              {whoop?.recovery?.scorePercent != null ? `${whoop.recovery.scorePercent}%` : '–'}
                             </p>
-                            <div className="mt-1">
-                              {fitbit?.metrics?.dailyRestingHeartRate ? (
-                                <KeyValueTree value={fitbit.metrics.dailyRestingHeartRate.latest} />
-                              ) : (
-                                <span className="text-sm text-muted">–</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="rounded-xl bg-card p-3">
-                            <p className="text-xs text-muted">Gewicht {fitbit?.metrics?.weight ? `· ${fitbit.metrics.weight.count} Datenpunkte` : ''}</p>
-                            <div className="mt-1">
-                              {fitbit?.metrics?.weight ? <KeyValueTree value={fitbit.metrics.weight.latest} /> : <span className="text-sm text-muted">–</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted">
-                          Aktivität {fitbit?.metrics?.steps ? `· ${fitbit.metrics.steps.count} Datenpunkte, letzte 7 Tage` : ''}
-                        </p>
-                        <div className="mt-2 rounded-xl bg-card p-3">
-                          {fitbit?.metrics?.steps ? <KeyValueTree value={fitbit.metrics.steps.latest} /> : <span className="text-sm text-muted">–</span>}
-                        </div>
-                      </div>
+                            <p className="text-xs text-muted">Ruhepuls: {whoop?.recovery?.restingHeartRate ?? '–'}</p>
+                          </MetricTile>
+                          <MetricTile label="Whoop Body">
+                            <p className="text-sm text-ink">
+                              {whoop?.bodyMeasurement?.weightKilogram != null ? `${whoop.bodyMeasurement.weightKilogram} kg` : '–'}
+                            </p>
+                            <p className="text-xs text-muted">Max-Puls: {whoop?.bodyMeasurement?.maxHeartRate ?? '–'}</p>
+                          </MetricTile>
+                        </>
+                      ) : null}
+                      {isFitbitConnected ? (
+                        <>
+                          <MetricTile
+                            label="Fitbit Ruhepuls"
+                            sublabel={fitbit?.metrics?.dailyRestingHeartRate ? `${fitbit.metrics.dailyRestingHeartRate.count} Datenpunkte` : undefined}
+                          >
+                            {fitbit?.metrics?.dailyRestingHeartRate ? (
+                              <KeyValueTree value={fitbit.metrics.dailyRestingHeartRate.latest} />
+                            ) : (
+                              <span className="text-sm text-muted">Keine Daten</span>
+                            )}
+                          </MetricTile>
+                          <MetricTile label="Fitbit Gewicht" sublabel={fitbit?.metrics?.weight ? `${fitbit.metrics.weight.count} Datenpunkte` : undefined}>
+                            {fitbit?.metrics?.weight ? <KeyValueTree value={fitbit.metrics.weight.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
+                          </MetricTile>
+                        </>
+                      ) : null}
                     </div>
-                  </DataSection>
-                ) : null}
+                  ) : null}
+
+                  {dataTab === 'aktivitaet' ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {isWhoopConnected ? (
+                        <MetricTile label="Whoop Strain" sublabel={formatDateTime(whoop?.strain?.date)}>
+                          <p className="text-lg font-semibold text-ink">{whoop?.strain?.score != null ? whoop.strain.score.toFixed(1) : '–'}</p>
+                          <p className="text-xs text-muted">Ø-Puls: {whoop?.strain?.averageHeartRate ?? '–'}</p>
+                        </MetricTile>
+                      ) : null}
+                      {isFitbitConnected ? (
+                        <MetricTile label="Fitbit Schritte" sublabel={fitbit?.metrics?.steps ? `${fitbit.metrics.steps.count} Datenpunkte, letzte 7 Tage` : undefined}>
+                          {fitbit?.metrics?.steps ? <KeyValueTree value={fitbit.metrics.steps.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
+                        </MetricTile>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             )}
           </section>
