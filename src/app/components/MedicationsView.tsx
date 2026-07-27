@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { getBrowserSupabaseClient } from '@/app/lib/supabaseBrowser';
+import { ConfirmedMedication, PrescriptionMatch, PrescriptionReviewSheet } from './PrescriptionReviewSheet';
 import {
   MAX_TIMES_PER_DAY,
   MEDICATION_CATEGORIES,
@@ -50,6 +51,15 @@ const WEEKDAY_DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 function doseKey(medicationId: string, doseIndex: number): string {
   return `${medicationId}#${doseIndex}`;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function formToPayload(form: FormState) {
@@ -295,6 +305,11 @@ export function MedicationsView() {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [isExtractingPrescription, setIsExtractingPrescription] = useState(false);
+  const [prescriptionError, setPrescriptionError] = useState('');
+  const [prescriptionMatches, setPrescriptionMatches] = useState<PrescriptionMatch[] | null>(null);
+
   useEffect(() => {
     const load = async () => {
       const client = getBrowserSupabaseClient();
@@ -449,6 +464,76 @@ export function MedicationsView() {
     }
   };
 
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = '';
+    if (!file || !accessToken) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setPrescriptionError('Bitte ein Foto (JPEG, PNG, WEBP oder HEIC) hochladen.');
+      return;
+    }
+
+    setPrescriptionError('');
+    setIsExtractingPrescription(true);
+
+    try {
+      const fileData = await readFileAsDataUrl(file);
+      const response = await fetch('/api/medications/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ fileData, fileName: file.name }),
+      });
+
+      const payload = (await response.json()) as { matches?: PrescriptionMatch[]; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'Auslesen fehlgeschlagen.');
+      }
+
+      setPrescriptionMatches(payload.matches ?? []);
+    } catch (err) {
+      setPrescriptionError(err instanceof Error ? err.message : 'Auslesen fehlgeschlagen.');
+    } finally {
+      setIsExtractingPrescription(false);
+    }
+  };
+
+  const handleConfirmPrescription = async (rows: ConfirmedMedication[]) => {
+    if (!accessToken) {
+      throw new Error('Nicht angemeldet.');
+    }
+
+    const created: Medication[] = [];
+    for (const row of rows) {
+      const response = await fetch('/api/medications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          name: row.name,
+          description: row.description,
+          category: row.category,
+          frequencyType: row.frequencyType,
+          weekdays: [],
+          intervalDays: null,
+          timesPerDay: row.timesPerDay,
+          startDate: todayIso(),
+          active: true,
+        }),
+      });
+
+      const payload = (await response.json()) as { entry?: Medication; error?: string };
+      if (!response.ok || !payload.entry) {
+        throw new Error(payload.error ?? `Speichern von "${row.name}" fehlgeschlagen.`);
+      }
+      created.push(payload.entry);
+    }
+
+    setMedications((current) => [...created, ...current]);
+    setPrescriptionMatches(null);
+  };
+
   if (isLoading) {
     return (
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
@@ -549,18 +634,37 @@ export function MedicationsView() {
         </div>
       ) : (
         <div className="mt-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-ink">Deine Einträge</h2>
             {!isFormOpen ? (
-              <button
-                type="button"
-                onClick={openAddForm}
-                className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep"
-              >
-                + Neuer Eintrag
-              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={isExtractingPrescription}
+                  className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-60"
+                >
+                  {isExtractingPrescription ? 'Rezept wird gelesen…' : '📷 Rezept hochladen'}
+                </button>
+                <button
+                  type="button"
+                  onClick={openAddForm}
+                  className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep"
+                >
+                  + Neuer Eintrag
+                </button>
+              </div>
             ) : null}
           </div>
+          {prescriptionError ? <p className="text-sm text-red-600">{prescriptionError}</p> : null}
 
           {isFormOpen ? (
             <>
@@ -611,6 +715,14 @@ export function MedicationsView() {
           )}
         </div>
       )}
+
+      {prescriptionMatches ? (
+        <PrescriptionReviewSheet
+          matches={prescriptionMatches}
+          onClose={() => setPrescriptionMatches(null)}
+          onConfirm={handleConfirmPrescription}
+        />
+      ) : null}
     </main>
   );
 }
