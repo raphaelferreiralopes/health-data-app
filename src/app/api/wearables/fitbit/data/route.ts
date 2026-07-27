@@ -7,7 +7,9 @@ const API_BASE = 'https://health.googleapis.com/v4';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const REFRESH_MARGIN_MS = 60_000;
 // https://developers.google.com/health/reference/rest/v4/users.dataTypes.dataPoints
-const DATA_TYPES = ['steps', 'dailyRestingHeartRate', 'sleep', 'weight'] as const;
+// Order drives display order in the UI -- sleep and vitals (heart rate,
+// weight) first, activity last (see WearablesOverview.tsx).
+const DATA_TYPES = ['sleep', 'dailyRestingHeartRate', 'weight', 'steps'] as const;
 const LOOKBACK_DAYS = 7;
 
 type ConnectionRow = {
@@ -121,7 +123,20 @@ export async function GET(request: Request) {
     const metrics: Record<string, { count: number; latest: unknown } | null> = {};
     DATA_TYPES.forEach((dataType, index) => {
       const points = bodies[index]?.dataPoints ?? [];
-      metrics[dataType] = points.length > 0 ? { count: points.length, latest: points[points.length - 1] } : null;
+      if (points.length === 0) {
+        metrics[dataType] = null;
+        return;
+      }
+      const rawLatest = points[points.length - 1];
+      // Each dataPoint wraps the actual value under a key matching the data
+      // type name (e.g. { dataSource: {...}, sleep: {...} }) alongside
+      // dataSource metadata we don't need to show -- unwrap it so the UI
+      // renders the value itself instead of that wrapper.
+      const latest =
+        rawLatest && typeof rawLatest === 'object' && dataType in (rawLatest as Record<string, unknown>)
+          ? (rawLatest as Record<string, unknown>)[dataType]
+          : rawLatest;
+      metrics[dataType] = { count: points.length, latest };
     });
 
     return NextResponse.json({ connected: true, metrics });

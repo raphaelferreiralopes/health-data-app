@@ -21,13 +21,6 @@ type FitbitData = {
   metrics?: Record<string, { count: number; latest: unknown } | null>;
 };
 
-const FITBIT_TYPE_LABELS: Record<string, string> = {
-  steps: 'Schritte',
-  dailyRestingHeartRate: 'Ruhepuls',
-  sleep: 'Schlaf',
-  weight: 'Gewicht',
-};
-
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '–';
   return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -40,18 +33,42 @@ function formatDuration(ms: number | null | undefined): string {
   return `${hours}h ${minutes}min`;
 }
 
-/** Best-effort flat rendering of an unknown-shaped API object -- see fitbit/data/route.ts for why the shape isn't hardcoded. */
-function RawValuePreview({ value }: { value: unknown }) {
-  if (value === null || typeof value !== 'object') {
-    return <span className="text-ink">{String(value)}</span>;
+function formatPrimitive(value: unknown): string {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+    return formatDateTime(value);
   }
-  const entries = Object.entries(value as Record<string, unknown>);
+  if (value === null || value === undefined || value === '') {
+    return '–';
+  }
+  return String(value);
+}
+
+/**
+ * Recursively renders an unknown-shaped API object as an indented
+ * key/value tree instead of a raw JSON dump -- see fitbit/data/route.ts for
+ * why the exact shape isn't hardcoded into named fields.
+ */
+function KeyValueTree({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  if (value === null || value === undefined) {
+    return <span className="text-sm text-muted">–</span>;
+  }
+  if (typeof value !== 'object') {
+    return <span className="text-sm text-ink">{formatPrimitive(value)}</span>;
+  }
+
+  const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v] as const) : Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) {
+    return <span className="text-sm text-muted">–</span>;
+  }
+
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+    <dl className={`flex flex-col gap-1.5 ${depth > 0 ? 'ml-3 border-l border-line pl-3' : ''}`}>
       {entries.map(([key, val]) => (
-        <div key={key} className="contents">
-          <dt className="text-muted">{key}</dt>
-          <dd className="truncate text-ink">{typeof val === 'object' ? JSON.stringify(val) : String(val)}</dd>
+        <div key={key}>
+          <dt className="text-xs text-muted">{key}</dt>
+          <dd className="mt-0.5">
+            {val !== null && typeof val === 'object' ? <KeyValueTree value={val} depth={depth + 1} /> : <span className="text-sm text-ink">{formatPrimitive(val)}</span>}
+          </dd>
         </div>
       ))}
     </dl>
@@ -263,21 +280,48 @@ export function WearablesOverview() {
 
                 {isFitbitConnected ? (
                   <DataSection title="Fitbit" isExpired={fitbit?.expired} loadError={fitbit?.error}>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {Object.entries(fitbit?.metrics ?? {}).map(([type, entry]) => (
-                        <div key={type} className="rounded-xl bg-card p-3">
-                          <p className="text-xs text-muted">
-                            {FITBIT_TYPE_LABELS[type] ?? type} {entry ? `(${entry.count} Datenpunkte, letzte 7 Tage)` : ''}
-                          </p>
-                          {entry ? (
-                            <div className="mt-1">
-                              <RawValuePreview value={entry.latest} />
-                            </div>
-                          ) : (
-                            <p className="mt-1 text-sm text-ink">–</p>
-                          )}
+                    <div className="flex flex-col gap-5">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                          Schlaf {fitbit?.metrics?.sleep ? `· ${fitbit.metrics.sleep.count} Datenpunkte, letzte 7 Tage` : ''}
+                        </p>
+                        <div className="mt-2 rounded-xl bg-card p-3">
+                          {fitbit?.metrics?.sleep ? <KeyValueTree value={fitbit.metrics.sleep.latest} /> : <span className="text-sm text-muted">–</span>}
                         </div>
-                      ))}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted">Vitalwerte</p>
+                        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="rounded-xl bg-card p-3">
+                            <p className="text-xs text-muted">
+                              Ruhepuls {fitbit?.metrics?.dailyRestingHeartRate ? `· ${fitbit.metrics.dailyRestingHeartRate.count} Datenpunkte` : ''}
+                            </p>
+                            <div className="mt-1">
+                              {fitbit?.metrics?.dailyRestingHeartRate ? (
+                                <KeyValueTree value={fitbit.metrics.dailyRestingHeartRate.latest} />
+                              ) : (
+                                <span className="text-sm text-muted">–</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-card p-3">
+                            <p className="text-xs text-muted">Gewicht {fitbit?.metrics?.weight ? `· ${fitbit.metrics.weight.count} Datenpunkte` : ''}</p>
+                            <div className="mt-1">
+                              {fitbit?.metrics?.weight ? <KeyValueTree value={fitbit.metrics.weight.latest} /> : <span className="text-sm text-muted">–</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                          Aktivität {fitbit?.metrics?.steps ? `· ${fitbit.metrics.steps.count} Datenpunkte, letzte 7 Tage` : ''}
+                        </p>
+                        <div className="mt-2 rounded-xl bg-card p-3">
+                          {fitbit?.metrics?.steps ? <KeyValueTree value={fitbit.metrics.steps.latest} /> : <span className="text-sm text-muted">–</span>}
+                        </div>
+                      </div>
                     </div>
                   </DataSection>
                 ) : null}
