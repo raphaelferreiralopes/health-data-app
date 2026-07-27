@@ -11,6 +11,12 @@ const REFRESH_MARGIN_MS = 60_000;
 // weight) first, activity last (see WearablesOverview.tsx).
 const DATA_TYPES = ['sleep', 'dailyRestingHeartRate', 'weight', 'steps'] as const;
 const LOOKBACK_DAYS = 7;
+// pageSize max is type-dependent -- sleep/exercise cap out at 25, everything
+// else allows much more (default 1440, max 10000). Requesting a too-high
+// pageSize for a capped type gets rejected with a 400, which is exactly
+// what broke "sleep" here.
+const MAX_PAGE_SIZE: Partial<Record<(typeof DATA_TYPES)[number], number>> = { sleep: 25 };
+const DEFAULT_PAGE_SIZE = 100;
 
 type ConnectionRow = {
   access_token: string;
@@ -107,7 +113,7 @@ export async function GET(request: Request) {
       DATA_TYPES.map((dataType) => {
         const url = new URL(`${API_BASE}/users/me/dataTypes/${dataType}/dataPoints`);
         url.searchParams.set('filter', `${dataType}.interval.start_time >= "${since}"`);
-        url.searchParams.set('pageSize', '100');
+        url.searchParams.set('pageSize', String(MAX_PAGE_SIZE[dataType] ?? DEFAULT_PAGE_SIZE));
         return fetch(url, { headers: authHeaders });
       }),
     );
