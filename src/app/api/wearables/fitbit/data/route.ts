@@ -141,7 +141,17 @@ export async function GET(request: Request) {
       const body = bodies[index];
       if (!body.ok) {
         console.error('Google Health dataPoints request failed', { userId, dataType, status: body.status, body: body.text });
-        metrics[dataType] = { error: `Fehler ${body.status}` };
+        // Google's error bodies are usually JSON with a human-readable
+        // "message" -- surface that instead of just the status code so an
+        // API error is actually diagnosable from the UI.
+        let detail = body.text;
+        try {
+          const parsed = JSON.parse(body.text) as { error?: { message?: string } };
+          if (parsed.error?.message) detail = parsed.error.message;
+        } catch {
+          // body wasn't JSON; fall back to the raw text as-is
+        }
+        metrics[dataType] = { error: `Fehler ${body.status}: ${detail || 'keine Details'}` };
         return;
       }
 
