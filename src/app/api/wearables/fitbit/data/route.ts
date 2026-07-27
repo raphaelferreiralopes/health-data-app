@@ -116,13 +116,30 @@ export async function GET(request: Request) {
       return NextResponse.json({ connected: true, expired: true, error: 'Zugriff abgelaufen. Bitte erneut verbinden.' });
     }
 
+    // A non-ok, non-401 response (e.g. 403 for a data type the granted
+    // scopes don't cover, or 400 for a bad filter) previously looked
+    // identical to "no data" in the UI -- capture the actual error per type
+    // instead so a real API problem doesn't masquerade as an empty result.
     const bodies = await Promise.all(
-      responses.map((res) => (res.ok ? (res.json() as Promise<{ dataPoints?: unknown[] }>) : Promise.resolve(null))),
+      responses.map(async (res) => {
+        if (res.ok) {
+          return { ok: true as const, data: (await res.json()) as { dataPoints?: unknown[] } };
+        }
+        const text = await res.text().catch(() => '');
+        return { ok: false as const, status: res.status, text: text.slice(0, 300) };
+      }),
     );
 
-    const metrics: Record<string, { count: number; latest: unknown } | null> = {};
+    const metrics: Record<string, { count: number; latest: unknown } | { error: string } | null> = {};
     DATA_TYPES.forEach((dataType, index) => {
-      const points = bodies[index]?.dataPoints ?? [];
+      const body = bodies[index];
+      if (!body.ok) {
+        console.error('Google Health dataPoints request failed', { userId, dataType, status: body.status, body: body.text });
+        metrics[dataType] = { error: `Fehler ${body.status}` };
+        return;
+      }
+
+      const points = body.data.dataPoints ?? [];
       if (points.length === 0) {
         metrics[dataType] = null;
         return;

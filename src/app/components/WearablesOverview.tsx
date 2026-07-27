@@ -14,11 +14,13 @@ type WhoopData = {
   bodyMeasurement?: { heightMeter: number | null; weightKilogram: number | null; maxHeartRate: number | null } | null;
 };
 
+type FitbitMetricEntry = { count: number; latest: unknown } | { error: string } | null;
+
 type FitbitData = {
   connected: boolean;
   expired?: boolean;
   error?: string;
-  metrics?: Record<string, { count: number; latest: unknown } | null>;
+  metrics?: Record<string, FitbitMetricEntry>;
 };
 
 type DataTab = 'schlaf' | 'vitalwerte' | 'aktivitaet';
@@ -112,6 +114,22 @@ function MetricTile({ label, sublabel, children }: { label: string; sublabel?: s
       </p>
       <div className="mt-1.5">{children}</div>
     </div>
+  );
+}
+
+/** Renders a Fitbit metric entry, distinguishing a real API error from a genuinely empty result. */
+function FitbitMetricTile({ label, entry }: { label: string; entry: FitbitMetricEntry }) {
+  if (entry && 'error' in entry) {
+    return (
+      <MetricTile label={label}>
+        <span className="text-sm text-red-600">{entry.error}</span>
+      </MetricTile>
+    );
+  }
+  return (
+    <MetricTile label={label} sublabel={entry ? `${entry.count} Datenpunkte, letzte 7 Tage` : undefined}>
+      {entry ? <KeyValueTree value={entry.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
+    </MetricTile>
   );
 }
 
@@ -305,11 +323,7 @@ export function WearablesOverview() {
                           <p className="text-xs text-muted">{formatDuration(whoop?.sleep?.inBedMilli)} im Bett</p>
                         </MetricTile>
                       ) : null}
-                      {isFitbitConnected ? (
-                        <MetricTile label="Fitbit" sublabel={fitbit?.metrics?.sleep ? `${fitbit.metrics.sleep.count} Datenpunkte, letzte 7 Tage` : undefined}>
-                          {fitbit?.metrics?.sleep ? <KeyValueTree value={fitbit.metrics.sleep.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
-                        </MetricTile>
-                      ) : null}
+                      {isFitbitConnected ? <FitbitMetricTile label="Fitbit" entry={fitbit?.metrics?.sleep ?? null} /> : null}
                     </div>
                   ) : null}
 
@@ -333,19 +347,8 @@ export function WearablesOverview() {
                       ) : null}
                       {isFitbitConnected ? (
                         <>
-                          <MetricTile
-                            label="Fitbit Ruhepuls"
-                            sublabel={fitbit?.metrics?.dailyRestingHeartRate ? `${fitbit.metrics.dailyRestingHeartRate.count} Datenpunkte` : undefined}
-                          >
-                            {fitbit?.metrics?.dailyRestingHeartRate ? (
-                              <KeyValueTree value={fitbit.metrics.dailyRestingHeartRate.latest} />
-                            ) : (
-                              <span className="text-sm text-muted">Keine Daten</span>
-                            )}
-                          </MetricTile>
-                          <MetricTile label="Fitbit Gewicht" sublabel={fitbit?.metrics?.weight ? `${fitbit.metrics.weight.count} Datenpunkte` : undefined}>
-                            {fitbit?.metrics?.weight ? <KeyValueTree value={fitbit.metrics.weight.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
-                          </MetricTile>
+                          <FitbitMetricTile label="Fitbit Ruhepuls" entry={fitbit?.metrics?.dailyRestingHeartRate ?? null} />
+                          <FitbitMetricTile label="Fitbit Gewicht" entry={fitbit?.metrics?.weight ?? null} />
                         </>
                       ) : null}
                     </div>
@@ -359,11 +362,7 @@ export function WearablesOverview() {
                           <p className="text-xs text-muted">Ø-Puls: {whoop?.strain?.averageHeartRate ?? '–'}</p>
                         </MetricTile>
                       ) : null}
-                      {isFitbitConnected ? (
-                        <MetricTile label="Fitbit Schritte" sublabel={fitbit?.metrics?.steps ? `${fitbit.metrics.steps.count} Datenpunkte, letzte 7 Tage` : undefined}>
-                          {fitbit?.metrics?.steps ? <KeyValueTree value={fitbit.metrics.steps.latest} /> : <span className="text-sm text-muted">Keine Daten</span>}
-                        </MetricTile>
-                      ) : null}
+                      {isFitbitConnected ? <FitbitMetricTile label="Fitbit Schritte" entry={fitbit?.metrics?.steps ?? null} /> : null}
                     </div>
                   ) : null}
                 </div>
