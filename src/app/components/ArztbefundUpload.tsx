@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { getBrowserSupabaseClient } from '@/app/lib/supabaseBrowser';
-import { ArztbefundDetailSheet, ArztbefundEntry } from './ArztbefundDetailSheet';
+import { ArztbefundEntry } from './ArztbefundDetailSheet';
 import { ConfirmedLabResult, ExtractionMatch, ExtractionReviewSheet } from './ExtractionReviewSheet';
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -14,20 +14,15 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function formatDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-export function ArztbefundOverview() {
+export function ArztbefundUpload() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [entries, setEntries] = useState<ArztbefundEntry[]>([]);
-  const [selectedEntry, setSelectedEntry] = useState<ArztbefundEntry | null>(null);
 
   const [title, setTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [lastUploaded, setLastUploaded] = useState<ArztbefundEntry | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [extractionMatches, setExtractionMatches] = useState<ExtractionMatch[] | null>(null);
 
@@ -40,23 +35,8 @@ export function ArztbefundOverview() {
       }
 
       const { data } = await client.auth.getSession();
-      const token = data.session?.access_token ?? null;
-      setAccessToken(token);
-
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/arztbefund-uploads', { headers: { Authorization: `Bearer ${token}` } });
-        const payload = (await response.json()) as { entries?: ArztbefundEntry[] };
-        setEntries(payload.entries ?? []);
-      } catch {
-        // list falls back to the empty state if the lookup fails
-      } finally {
-        setIsLoading(false);
-      }
+      setAccessToken(data.session?.access_token ?? null);
+      setIsLoading(false);
     };
 
     void init();
@@ -84,6 +64,7 @@ export function ArztbefundOverview() {
     }
 
     setErrorMessage('');
+    setLastUploaded(null);
     setIsExplaining(true);
 
     try {
@@ -99,7 +80,7 @@ export function ArztbefundOverview() {
         throw new Error(payload.error ?? 'Auswertung fehlgeschlagen.');
       }
 
-      setEntries((current) => [payload.entry as ArztbefundEntry, ...current]);
+      setLastUploaded(payload.entry);
       if (payload.matches && payload.matches.length > 0) {
         setExtractionMatches(payload.matches);
       }
@@ -132,24 +113,6 @@ export function ArztbefundOverview() {
     }
 
     setExtractionMatches(null);
-  };
-
-  const handleDelete = async (entryId: string) => {
-    setEntries((current) => current.filter((entry) => entry.id !== entryId));
-    setSelectedEntry(null);
-
-    if (!accessToken) {
-      return;
-    }
-
-    try {
-      await fetch(`/api/arztbefund-uploads/${entryId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-    } catch {
-      // best-effort; reappears on next reload if the delete failed
-    }
   };
 
   return (
@@ -198,39 +161,14 @@ export function ArztbefundOverview() {
         </form>
       )}
 
-      <div className="mt-8">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Erklärte Arztbefunde</h2>
-
-        {isLoading ? (
-          <p className="mt-4 text-sm text-muted">Lade…</p>
-        ) : entries.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">Noch keine Arztbefunde hochgeladen.</p>
-        ) : (
-          <div className="mt-4 flex flex-col gap-4">
-            {entries.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                onClick={() => setSelectedEntry(entry)}
-                className="flex w-full flex-col items-start gap-1 rounded-2xl border border-line bg-surface p-6 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              >
-                <div className="flex w-full flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-base font-semibold text-ink">{entry.title}</h3>
-                  <span className="text-xs text-muted">{formatDate(entry.createdAt)}</span>
-                </div>
-                <p className="line-clamp-2 text-sm text-muted">{entry.explanationLevel1}</p>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {selectedEntry ? (
-        <ArztbefundDetailSheet
-          entry={selectedEntry}
-          onClose={() => setSelectedEntry(null)}
-          onDelete={() => handleDelete(selectedEntry.id)}
-        />
+      {lastUploaded ? (
+        <p className="mt-4 text-sm text-ink">
+          &bdquo;{lastUploaded.title}&ldquo; wurde ausgewertet.{' '}
+          <a href="/datenbank/dokumente" className="font-medium text-brand hover:text-brand-deep">
+            Im Dokumente-Tab ansehen
+          </a>
+          .
+        </p>
       ) : null}
 
       {extractionMatches ? (

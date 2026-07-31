@@ -1,5 +1,5 @@
-import { ArztbefundOverview } from '@/app/components/ArztbefundOverview';
+import { ArztbefundList } from '@/app/components/ArztbefundList';
 
 export default function DokumentePage() {
-  return <ArztbefundOverview />;
+  return <ArztbefundList />;
 }
