@@ -188,6 +188,10 @@ function LoginForm() {
           <a href="/datenschutz" className="hover:text-ink">
             Datenschutz &amp; Hinweise
           </a>
+          <span className="mx-2">·</span>
+          <a href="/impressum" className="hover:text-ink">
+            Impressum
+          </a>
         </p>
       </div>
     </main>

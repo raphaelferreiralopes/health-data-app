@@ -49,17 +49,30 @@ export default function DatenschutzPage() {
         <div>
           <h2 className="text-base font-semibold text-ink">Wer die Daten sonst noch sieht</h2>
           <p className="mt-2 text-sm text-muted">
-            Zwei Auftragsverarbeiter, technisch notwendig für den Betrieb der App:
+            Drei Auftragsverarbeiter, technisch notwendig für den Betrieb der App:
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
             <li>
-              <strong className="text-ink">Supabase</strong> -- Hosting von Datenbank, Datei-Uploads und Login.
+              <strong className="text-ink">Supabase</strong> -- Hosting von Datenbank, Datei-Uploads und Login. Serverstandort
+              Vereinigtes Königreich (UK). Die EU-Kommission hat für das UK einen Angemessenheitsbeschluss nach Art. 45 DSGVO
+              erlassen (zuletzt verlängert im Dezember 2025, gültig bis Dezember 2031) -- die Datenübermittlung dorthin gilt
+              damit als datenschutzrechtlich abgesichert, ohne dass zusätzliche Garantien wie Standardvertragsklauseln
+              erforderlich sind.
+            </li>
+            <li>
+              <strong className="text-ink">Vercel</strong> -- Hosting der Anwendung selbst (Ausführung der Server-Logik,
+              die jede Anfrage inkl. Login-Session verarbeitet). Die Ausführung ist auf die EU-Region Frankfurt konfiguriert.
+              Vercel Inc. hat seinen Sitz in den USA; für etwaige Verarbeitung durch Subunternehmer außerhalb der EU/des EWR
+              stützt sich Vercel auf EU-Standardvertragsklauseln und das UK-Addendum.
             </li>
             <li>
               <strong className="text-ink">Google (Gemini API)</strong> -- nur wenn du aktiv &bdquo;Werte automatisch auslesen&ldquo; nutzt,
               wird das jeweilige Dokument zur Auswertung an die Gemini-API geschickt. Dabei findet eine Übertragung in die USA
-              statt (Google LLC bzw. Google Ireland Limited als Auftragsverarbeiter). Wir befinden uns in der Prüfung
-              geeigneter Garantien (z. B. Standardvertragsklauseln) für diese Übermittlung.
+              statt (Google LLC bzw. Google Ireland Limited als Auftragsverarbeiter). Aktuell nutzen wir dafür die kostenlose
+              Stufe der Gemini-API (Google AI Studio), da wir uns im privaten Beta-Test befinden -- eine belastbare
+              Auftragsverarbeitungsvereinbarung mit Google liegt für diese Stufe nicht vor. Vor einem öffentlichen Launch
+              stellen wir auf die kostenpflichtige Vertex-AI-Version mit EU-Serverstandort und regulärem
+              Auftragsverarbeitungsvertrag um.
             </li>
           </ul>
           <p className="mt-2 text-sm text-muted">

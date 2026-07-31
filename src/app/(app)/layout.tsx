@@ -20,9 +20,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {children}
-      <footer className="mt-auto border-t border-line px-4 py-6 text-center sm:px-6">
-        <a href="/datenschutz" className="text-xs text-muted hover:text-ink">
+      <footer className="mt-auto border-t border-line px-4 py-6 text-center text-xs text-muted sm:px-6">
+        <a href="/datenschutz" className="hover:text-ink">
           Datenschutz &amp; Hinweise
+        </a>
+        <span className="mx-2">·</span>
+        <a href="/impressum" className="hover:text-ink">
+          Impressum
         </a>
       </footer>
       <ChatBubble />
