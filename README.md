@@ -1,80 +1,72 @@
-# Gesundheitswerte (MVP)
+# longevitystack – health data app
 
-Web-App zur zentralen, kategorisierten Ansicht persönlicher Gesundheitswerte
-(Blut, Urin, Stuhl, Allergie). Kein Wearable-Sync, kein Arztbrief-Upload,
-kein Onboarding, kein Auth-UI -- nur die Datenbank-Ansicht.
+A web app that brings personal health data into one place: lab results, doctor's reports, medications, wearable data and upcoming appointments, explained in plain language and checked against sourced reference ranges.
 
-## Stack
+I built it because my own health data was scattered across PDFs from different labs, a Fitbit account and notes on my phone. It started as a read-only view of lab values and grew into a multi-user app with authentication, AI-assisted document upload and wearable integrations. The UI is in German because it targets users in Germany.
 
-- Next.js (App Router) + TypeScript + Tailwind CSS
-- Supabase (Postgres) mit Row-Level-Security, Zugriff über `@supabase/supabase-js`
-  (kein ORM -- bei reinem Read-Display für 4 Tabs wäre Prisma/Drizzle unnötiger
-  Overhead)
-- `src/core/` ist framework-agnostisch (keine Next.js-Imports): Typen,
-  Supabase-Client-Factory, Query-Funktionen, Referenzbereichs-Logik. Diese
-  Schicht soll später 1:1 in eine React Native/Expo-App wandern.
+Live: [longevitystack.vercel.app](https://longevitystack.vercel.app) (landing page and login on one domain)
 
-## Setup
+<!-- Screenshot: add one at docs/screenshot.png and uncomment the line below -->
+<!-- ![longevitystack: lab results overview](docs/screenshot.png) -->
 
-1. Supabase-Projekt anlegen (oder `supabase start` lokal, falls die
-   Supabase CLI installiert ist).
-2. Migrationen ausführen: `supabase/migrations/0001_schema.sql`, dann
-   `0002_rls_policies.sql` (SQL-Editor im Dashboard oder `supabase db push`).
-3. Seed-Daten laden: `supabase/seed.sql`.
-4. `.env.local.example` nach `.env.local` kopieren und mit den Werten aus
-   Project Settings -> API befüllen.
-5. `npm install && npm run dev`, dann [http://localhost:3010](http://localhost:3010)
-   öffnen (redirected auf `/blutanalyse`). Port 3010 ist fest im `dev`-Skript
-   hinterlegt, damit `journal-app` weiter Port 3000 nutzen kann.
+## Highlights
 
-## Datenmodell
+- **Lab values with context.** A catalog of 136 parameters in 12 categories, each with a three-level explanation (short, detailed, expert) and reference ranges that depend on age and sex. Every reference range records its source (mostly German university hospital lab handbooks).
+- **Upload a doctor's report, get it explained.** PDFs and photos of lab reports and prescriptions are read by Gemini, which extracts the values into the database and explains the report at three levels of detail.
+- **Wearables.** OAuth integrations for Fitbit (via the Google Health API) with sleep, vitals and activity views. Whoop is built and shown as "planned".
+- **Medications and supplements.** Configurable schedules with several doses per day and a daily checklist. Prescriptions can be added from a photo.
+- **More views.** An interactive organ map that links organs to lab values, a guided full-body check, recommended follow-up tests, appointment tracking and a chatbot that answers questions about your own data.
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Frontend and API | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
+| Database and auth | Supabase (Postgres, Auth, row-level security) |
+| AI | Google Gemini for document extraction, explanations and the chatbot |
+| Integrations | Google Health API (Fitbit), Whoop API |
+| Hosting | Vercel |
+| Schema | 22 versioned SQL migrations in `supabase/migrations/` |
+
+## Security and privacy
+
+Health data is a special category under the GDPR, so I treated security and privacy as part of the product rather than an afterthought.
+
+- **Isolation in the database.** Every table with personal data has a row-level security policy on `auth.uid() = user_id`. API routes also filter by the caller's user id as a second layer.
+- **Hardened API.** Rate limiting on write endpoints, runtime validation of inputs, generic error messages to the client, and security headers (CSP, HSTS, X-Frame-Options and others) in `next.config.ts`.
+- **GDPR basics.** Explicit consent for health data at signup, account deletion that removes every user table, no tracking or analytics cookies, and a privacy notice that lists all processors.
+- **Written audits.** [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md) and [`DSGVO_AUDIT.md`](DSGVO_AUDIT.md) document a full review of the codebase, what was found and what has been fixed since.
+
+## Design decisions
+
+- **A framework-agnostic core.** `src/core/` holds types, queries and the reference-range logic without any Next.js imports, so it can move into a React Native app later without changes.
+- **No ORM.** The app mostly reads and displays data. Plain `supabase-js` queries kept it simpler than adding Prisma or Drizzle.
+- **Stable keys in the catalog.** Every lab parameter has a readable `key` (for example `hemoglobin`) next to its uuid. Seed data and migrations reference parameters by key, so no hand-maintained uuids are needed.
+- **History is in the schema from day one.** A user can have many results per parameter. The UI currently shows the latest value, and charts over time need no schema change.
+- **Age bands only where a source exists.** Age-specific reference ranges were added for 14 parameters with a citable adult age cut-off and deliberately left out elsewhere.
+
+## Project structure
 
 ```
-lab_categories (id, key, name, tab, sort_order)
-lab_subcategories (id, category_id, key, name, sort_order)
-lab_parameters (id, subcategory_id, key, name, abbreviation, unit,
-                description_level1, description_level2, description_level3,
-                learn_more_url, result_type [numeric|qualitative], sort_order)
-lab_reference_ranges (id, parameter_id, min, max, qualitative_normal,
-                      gender [m|f|all], age_min, age_max)
-lab_results (id, user_id, parameter_id, value, value_qualitative,
-             measured_at, source_document_id)
+src/
+  app/
+    (app)/        Signed-in pages: home, database, medications, organ map, processes, admin
+    api/          Route handlers (lab results, uploads, medications, wearables, chat, account)
+    lib/          Server helpers: auth, rate limiting, Supabase and Gemini clients
+    login/        Login and signup
+  core/           Framework-agnostic types, queries and reference-range logic
+supabase/
+  migrations/     Versioned schema and RLS policies
+  seed.sql        Lab catalog, reference ranges and demo results for a fixed demo user
 ```
 
-`key` ist ein stabiler, menschenlesbarer Bezeichner (z. B. `hemoglobin`),
-unabhängig von der uuid -- verwendet in `seed.sql`, um Fremdschlüssel ohne
-handgepflegte uuid-Literale zu verdrahten, und später für Deep-Links oder
-LOINC-artige Verknüpfung nutzbar.
+## Run locally
 
-`supabase/seed.sql` enthält den vollständigen Katalog aus
-`laborwerte_katalog.xlsx`: 12 Kategorien, 34 Unterkategorien, 136 Parameter.
-Referenzbereiche und result_type wurden nachträglich angereichert (im
-Original-Katalog laut Sheet "Legende" bewusst leer gelassen). Demo-Messwerte
-für den festen Demo-User gibt es weiterhin nur für eine kleine, realistische
-Auswahl von ~19 Parametern -- die App zeigt ohnehin nur Parameter mit
-tatsächlichem Eintrag an.
+1. Create a Supabase project, or run `supabase start` if you have the Supabase CLI.
+2. Apply the files in `supabase/migrations/` in order (SQL editor or `supabase db push`), then load `supabase/seed.sql`.
+3. Copy `.env.local.example` to `.env.local` and fill in the values. Supabase and Gemini are required. The Whoop and Google Health keys are only needed for the wearable integrations.
+4. `npm install && npm run dev`, then open [http://localhost:3010](http://localhost:3010).
 
-Verlauf ist im Schema bereits möglich (mehrere `lab_results` pro
-`parameter_id`/`user_id`); die App zeigt aktuell nur den jeweils neuesten
-Wert (`getTabOverview`/`getParameterDetail` sortieren nach `measured_at desc`
-und nehmen den ersten Treffer).
+## Status
 
-## Kein Auth im MVP
-
-`src/core/demoUser.ts` definiert eine feste `DEMO_USER_ID` (muss mit
-`user_id` in `seed.sql` übereinstimmen) plus eine Platzhalter-Demografie
-(Geschlecht/Alter) für die Referenzbereichs-Auswahl. Der Next.js-Server
-liest mit dem Supabase **Service-Role-Key** (`src/app/lib/supabaseServer.ts`,
-server-only, niemals im Client verwenden), da RLS auf `lab_results` bereits
-scharf auf `auth.uid() = user_id` steht. Sobald echtes Auth aktiviert wird,
-muss nur `DEMO_USER_ID`/`DEMO_USER_PROFILE` durch die echte Session ersetzt
-werden -- die RLS-Policies und Queries bleiben unverändert.
-
-## Platzhalter, die vor echtem Einsatz ersetzt werden müssen
-
-- Referenzbereiche in `supabase/seed.sql`: plausible Literaturwerte, keine
-  geprüften Laborreferenzen.
-- `learn_more_url` pro Parameter: zeigt auf eine Platzhalter-Domain
-  (`platzhalter-lexikon.example`), gedacht als austauschbares Datenfeld.
-- `DEMO_USER_PROFILE` (Geschlecht/Alter): fest codiert, da es noch kein
-  User-Profil gibt.
+A working beta that I use myself. Reference ranges are sourced but not reviewed by a medical professional, and the app is not a medical device.
